@@ -1,0 +1,13 @@
+# Godot
+.godot/
+/build/
+*.tmp
+
+# 字体の原本(tools/subset_font.py が取ってくる)
+/tools/font_src/
+
+# OS / エディター
+.DS_Store
+Thumbs.db
+.vscode/
+__pycache__/

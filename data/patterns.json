@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "bosses": [
+    { "id": "stone", "phases": [
+      { "patterns": [
+        { "id": "stone_1_teach", "teach": true, "length": 420, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 120, "travel1": 180, "hold": 0, "travel2": 0 } ] },
+        { "id": "stone_1_a", "length": 300, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 120, "kind": "white", "arm": "R", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 } ] },
+        { "id": "stone_1_b", "length": 270, "attacks": [
+          { "at": 0, "kind": "white", "arm": "R", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 90, "kind": "white", "arm": "L", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 } ] }
+      ] },
+      { "patterns": [
+        { "id": "stone_2_a", "length": 300, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 108, "kind": "white", "arm": "R", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 168, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] },
+        { "id": "stone_2_b", "length": 288, "attacks": [
+          { "at": 0, "kind": "white", "arm": "T", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 60, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 102, "kind": "white", "arm": "R", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 } ] },
+        { "id": "stone_2_c", "length": 300, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 30, "kind": "white", "arm": "R", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 168, "kind": "white", "arm": "T", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] }
+      ] },
+      { "patterns": [
+        { "id": "stone_3_a", "length": 312, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 60, "kind": "white", "arm": "R", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 150, "kind": "white", "arm": "T", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 210, "kind": "white", "arm": "L", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 } ] },
+        { "id": "stone_3_b", "length": 336, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 108, "kind": "white", "arm": "R", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 168, "kind": "white", "arm": "T", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 198, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] },
+        { "id": "stone_3_c", "length": 264, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 30, "kind": "white", "arm": "R", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 60, "kind": "white", "arm": "T", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 120, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] },
+        { "id": "stone_3_d", "length": 336, "attacks": [
+          { "at": 0, "kind": "white", "arm": "T", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 108, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 138, "kind": "white", "arm": "R", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 228, "kind": "white", "arm": "T", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 } ] }
+      ] }
+    ] },
+    { "id": "swing", "phases": [
+      { "patterns": [
+        { "id": "swing_1_teach", "teach": true, "length": 432, "attacks": [
+          { "at": 0, "kind": "white", "arm": "R", "windup": 96, "travel1": 72, "hold": 72, "travel2": 72 } ] },
+        { "id": "swing_1_a", "length": 360, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 60, "travel1": 48, "hold": 60, "travel2": 48 },
+          { "at": 144, "kind": "white", "arm": "R", "windup": 60, "travel1": 48, "hold": 36, "travel2": 48 } ] },
+        { "id": "swing_1_b", "length": 348, "attacks": [
+          { "at": 0, "kind": "white", "arm": "R", "windup": 60, "travel1": 48, "hold": 72, "travel2": 48 },
+          { "at": 114, "kind": "white", "arm": "L", "windup": 60, "travel1": 48, "hold": 48, "travel2": 48 } ] }
+      ] },
+      { "patterns": [
+        { "id": "swing_2_a", "length": 366, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 60, "travel1": 48, "hold": 60, "travel2": 48 },
+          { "at": 168, "kind": "white", "arm": "R", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 228, "kind": "white", "arm": "T", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] },
+        { "id": "swing_2_b", "length": 348, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 60, "kind": "white", "arm": "R", "windup": 48, "travel1": 36, "hold": 48, "travel2": 36 },
+          { "at": 126, "kind": "white", "arm": "T", "windup": 48, "travel1": 36, "hold": 72, "travel2": 36 } ] },
+        { "id": "swing_2_c", "length": 342, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 60, "travel1": 48, "hold": 36, "travel2": 48 },
+          { "at": 12, "kind": "white", "arm": "R", "windup": 60, "travel1": 48, "hold": 84, "travel2": 48 },
+          { "at": 204, "kind": "white", "arm": "T", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] }
+      ] },
+      { "patterns": [
+        { "id": "swing_3_a", "length": 378, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 48, "travel1": 36, "hold": 60, "travel2": 24 },
+          { "at": 150, "kind": "white", "arm": "R", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 132, "kind": "white", "arm": "T", "windup": 48, "travel1": 36, "hold": 36, "travel2": 36 },
+          { "at": 270, "kind": "white", "arm": "L", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 } ] },
+        { "id": "swing_3_b", "length": 366, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 24, "kind": "white", "arm": "R", "windup": 48, "travel1": 48, "hold": 72, "travel2": 24 },
+          { "at": 198, "kind": "white", "arm": "T", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 228, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] },
+        { "id": "swing_3_c", "length": 342, "attacks": [
+          { "at": 0, "kind": "white", "arm": "T", "windup": 60, "travel1": 48, "hold": 96, "travel2": 48 },
+          { "at": 54, "kind": "white", "arm": "L", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 114, "kind": "white", "arm": "R", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 204, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] },
+        { "id": "swing_3_d", "length": 324, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 48, "travel1": 24, "hold": 48, "travel2": 24 },
+          { "at": 96, "kind": "white", "arm": "R", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 126, "kind": "white", "arm": "T", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 186, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] }
+      ] }
+    ] },
+    { "id": "red", "phases": [
+      { "patterns": [
+        { "id": "red_1_teach", "teach": true, "length": 384, "attacks": [
+          { "at": 0, "kind": "red", "arm": "T", "windup": 120, "travel1": 144, "hold": 0, "travel2": 0 } ] },
+        { "id": "red_1_a", "length": 276, "attacks": [
+          { "at": 0, "kind": "red", "arm": "T", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 90, "kind": "white", "arm": "L", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 } ] },
+        { "id": "red_1_b", "length": 252, "attacks": [
+          { "at": 0, "kind": "white", "arm": "R", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 60, "kind": "red", "arm": "T", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 } ] }
+      ] },
+      { "patterns": [
+        { "id": "red_2_a", "length": 264, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 60, "kind": "white", "arm": "R", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 84, "kind": "red", "arm": "T", "windup": 48, "travel1": 96, "hold": 0, "travel2": 0 } ] },
+        { "id": "red_2_b", "length": 318, "attacks": [
+          { "at": 0, "kind": "red", "arm": "L", "windup": 60, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 120, "kind": "white", "arm": "R", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 180, "kind": "white", "arm": "T", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] },
+        { "id": "red_2_c", "length": 270, "attacks": [
+          { "at": 0, "kind": "white", "arm": "T", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 36, "kind": "red", "arm": "R", "windup": 48, "travel1": 84, "hold": 0, "travel2": 0 },
+          { "at": 132, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] }
+      ] },
+      { "patterns": [
+        { "id": "red_3_a", "length": 240, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 30, "kind": "white", "arm": "R", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 60, "kind": "white", "arm": "T", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 78, "kind": "red", "arm": "L", "windup": 48, "travel1": 72, "hold": 0, "travel2": 0 } ] },
+        { "id": "red_3_b", "length": 378, "attacks": [
+          { "at": 0, "kind": "white", "arm": "R", "windup": 60, "travel1": 48, "hold": 72, "travel2": 48 },
+          { "at": 12, "kind": "red", "arm": "L", "windup": 48, "travel1": 96, "hold": 0, "travel2": 0 },
+          { "at": 210, "kind": "white", "arm": "T", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 240, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] },
+        { "id": "red_3_c", "length": 300, "attacks": [
+          { "at": 0, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 30, "kind": "red", "arm": "T", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 },
+          { "at": 132, "kind": "white", "arm": "R", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 },
+          { "at": 192, "kind": "white", "arm": "L", "windup": 36, "travel1": 42, "hold": 0, "travel2": 0 } ] },
+        { "id": "red_3_d", "length": 354, "attacks": [
+          { "at": 0, "kind": "red", "arm": "L", "windup": 48, "travel1": 72, "hold": 0, "travel2": 0 },
+          { "at": 24, "kind": "white", "arm": "T", "windup": 48, "travel1": 36, "hold": 48, "travel2": 36 },
+          { "at": 132, "kind": "red", "arm": "R", "windup": 48, "travel1": 72, "hold": 0, "travel2": 0 },
+          { "at": 216, "kind": "white", "arm": "L", "windup": 48, "travel1": 60, "hold": 0, "travel2": 0 } ] }
+      ] }
+    ] }
+  ]
+}
