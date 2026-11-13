@@ -310,3 +310,18 @@ func test_nfr14_tuning_lives_in_balance() -> bool:
 			var code := line.split("#")[0]
 			ok(number.search(code) == null, "%s に数がじかに書いてある: %s" % [f, line.strip_edges()])
 	return true
+
+
+# 文言を足したのに字体を絞り直し忘れると、Web では豆腐(□)になるだけでエラーは出ない。strings.gd の全文字が字体にあるか見る。
+func test_font_has_every_string_char() -> bool:
+	var font: Font = load("res://assets/fonts/NotoSansJP-Subset.ttf")
+	var lit := RegEx.create_from_string("\"((?:[^\"\\\n]|\\.)*)\"")
+	var missing := ""
+	var found := lit.search_all(FileAccess.get_file_as_string("res://core/strings.gd"))
+	ok(found.size() > 50, "文字列を拾えている(%d 個)" % found.size())
+	for m: RegExMatch in found:
+		for ch: String in m.get_string(1):
+			if not font.has_char(ch.unicode_at(0)) and not missing.contains(ch):
+				missing += ch
+	eq(missing, "", "字体に無い字(python tools/subset_font.py を回す)")
+	return true

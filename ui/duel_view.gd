@@ -436,6 +436,7 @@ func _draw() -> void:
 		draw_arc(c, 104.0 + 10.0 * pulse, 0.0, TAU, 64, Color(Kit.C_SPARK, 0.95), 6.0, true)
 		draw_arc(c, 128.0 + 16.0 * pulse, 0.0, TAU, 64, Color(Kit.C_SPARK, 0.35 * (1.0 - pulse)), 3.0, true)
 		Kit.text(self, c + Vector2(0, 24), S.NOW, 64, Kit.C_SPARK, 900)
+		Kit.text(self, c + Vector2(0, 156), S.COUNTER_HINT, 28, Kit.C_SPARK, 700)
 	elif state == Duel.State.INTRO:
 		var k := float(tick - int(s["state_from"])) / B.INTRO_TICKS
 		var a2 := clampf(minf(k * 5.0, (1.0 - k) * 3.0), 0.0, 1.0)
@@ -593,8 +594,10 @@ func _draw_hud(s: Dictionary) -> void:
 			draw_rect(r, Kit.C_SPARK.lerp(Kit.C_WHITE, 0.6 * pulse) if full else Kit.C_SPARK)
 		else:
 			draw_rect(r, Color(Kit.C_DIM, 0.5), false, 2.0)
-	# 左右の半分の案内(最初の敵の教える型を抜けるまで)
-	if int(s["boss"]) == 1 and s["teaching"]:
-		draw_line(Vector2(360, 1206), Vector2(360, 1268), Color(Kit.C_DIM, 0.5), 2.0)
-		Kit.text(self, Vector2(180, 1250), S.DODGE, 30, Kit.C_DIM, 700)
-		Kit.text(self, Vector2(540, 1250), S.PARRY, 30, Kit.C_TEXT, 700)
+	# 左右の半分の案内。いつも出す。最初の敵と教える型の間ははっきり、ほかはうすく
+	var k := 1.0 if int(s["boss"]) == 1 or s["teaching"] else 0.45
+	draw_line(Vector2(360, 1200), Vector2(360, 1272), Color(Kit.C_DIM, 0.5 * k), 2.0)
+	Kit.text(self, Vector2(180, 1232), S.DODGE, 28, Color(Kit.C_TEXT, k), 700)
+	Kit.text(self, Vector2(180, 1262), S.KEYS_DODGE, 20, Color(Kit.C_DIM, k), 500)
+	Kit.text(self, Vector2(540, 1232), S.PARRY, 28, Color(Kit.C_TEXT, k), 700)
+	Kit.text(self, Vector2(540, 1262), S.KEYS_PARRY, 20, Color(Kit.C_DIM, k), 500)

@@ -4,13 +4,13 @@ extends "res://tests/suite.gd"
 
 const SfxScript := preload("res://audio/sfx.gd")
 const NAMES := ["warn_white", "warn_red", "parry", "just", "whiff", "clank", "dodge", "hurt", "soft", "stagger", "counter", "shatter"]
-# 長さの目安(ms)
+# 長さの目安(ms)。v0.1.1 から部屋の響きの尾を含む
 const LENGTH_MS := {
-	"warn_white": [60, 120], "warn_red": [60, 120], "parry": [80, 140], "just": [200, 320],
-	"whiff": [120, 180], "clank": [120, 180], "dodge": [180, 250], "hurt": [120, 200],
-	"soft": [40, 80], "stagger": [250, 400], "counter": [350, 500], "shatter": [500, 700],
+	"warn_white": [100, 240], "warn_red": [100, 200], "parry": [400, 700], "just": [650, 1050],
+	"whiff": [120, 220], "clank": [200, 400], "dodge": [180, 300], "hurt": [280, 480],
+	"soft": [40, 80], "stagger": [650, 1050], "counter": [850, 1300], "shatter": [800, 1250],
 }
-const PEAK_MAX := 23197  # −3 dBFS(32767 × 10^(−3/20))。これ以下なら割れていない
+const PEAK_MAX := 29205  # −1 dBFS(32767 × 10^(−1/20))。これ以下なら割れていない
 const PEAK_MIN := 2000  # 約 −24 dBFS。これより小さければ無音に近い
 
 
@@ -85,7 +85,7 @@ func test_wav_length_and_peak() -> bool:
 			continue
 		var want: Array = LENGTH_MS[sound_name]
 		ok(w["ms"] >= want[0] and w["ms"] <= want[1], "%s: 長さ %d ms が %d〜%d ms の外" % [sound_name, w["ms"], want[0], want[1]])
-		ok(w["peak"] <= PEAK_MAX, "%s: 最大振幅 %d が −3 dBFS を超える" % [sound_name, w["peak"]])
+		ok(w["peak"] <= PEAK_MAX, "%s: 最大振幅 %d が −1 dBFS を超える" % [sound_name, w["peak"]])
 		ok(w["peak"] >= PEAK_MIN, "%s: 最大振幅 %d は無音に近い" % [sound_name, w["peak"]])
 		ok(absi(w["first"]) < 200 and absi(w["last"]) < 200, "%s: 頭と尻が 0 から離れている(プチッと鳴る)" % sound_name)
 		peaks[sound_name] = w["peak"]

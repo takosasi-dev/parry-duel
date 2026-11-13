@@ -32,6 +32,9 @@ func _ready() -> void:
 	var title := Kit.button("btn_pause_title", S.BTN_TITLE, 32, "quiet")
 	title.pressed.connect(func() -> void: _main.go_title())
 	_box.add_child(Kit.place(title, 80, 814, 560, 96))
+	for i in 3:
+		var how: Label = Title.put(_box, [S.HOW_PARRY, S.HOW_DODGE, S.HOW_COUNTER][i], 24, 500, Kit.C_DIM, Rect2(40, 950 + i * 44, 640, 40))
+		Title.fit(how)
 
 
 func _input(event: InputEvent) -> void:

@@ -3,7 +3,7 @@
 extends RefCounted
 
 const GAME_NAME := "ParryDuel"
-const VERSION := "v0.1.0"
+const VERSION := "v0.1.1"
 const SHARE_URL := "https://takosasi-dev.github.io/parry-duel/"
 
 # S1 タイトル
@@ -23,11 +23,19 @@ const STAGGER := "よろけ"
 const HP := "体力"
 const DODGE := "避ける"
 const PARRY := "弾く"
-const TEACH_PARRY := "線に届く瞬間に、右を押す"
-const TEACH_DODGE := "赤は弾けない。左で避ける"
+const TEACH_PARRY := "白が線に届く瞬間に、右半分を押す"
+const TEACH_DODGE := "赤は弾けない。左半分を押して避ける"
 const TEACH_FREE := "今は減らない"
 const JUST := "ぴったり"
 const NOW := "いま!"
+const COUNTER_HINT := "右半分を押して反撃"
+# 画面の下の、左右の半分の案内(マウス・タッチは半分を押す。キーは Z / Space)
+const KEYS_DODGE := "左半分 / Z"
+const KEYS_PARRY := "右半分 / Space"
+# 一時停止の画面に出す、操作の一覧
+const HOW_PARRY := "弾く: 画面の右半分 / Space・X"
+const HOW_DODGE := "避ける: 画面の左半分 / Z・左Shift"
+const HOW_COUNTER := "敵がよろけたら、弾くで反撃"
 const BTN_RETRY := "この敵からやり直す"
 const BTN_TITLE := "タイトルへ"
 
@@ -60,7 +68,7 @@ const BTN_BACK := "戻る"
 
 # S6 タイミング合わせ
 const CALIB := "タイミング合わせ"
-const CALIB_GUIDE := "頭が線に届く瞬間に、右を押す(8 回)"
+const CALIB_GUIDE := "頭が線に届く瞬間に、右半分を押す(8 回)"
 const CALIB_DIFF := "今の差"
 const CALIB_FAILED := "測れなかった。もう一度測る"
 const BTN_USE := "この値を使う"
