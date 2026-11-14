@@ -116,10 +116,31 @@ func _ready() -> void:
 		_box.add_child(Kit.place(copy, 80, bottom + 44, 270, 96))
 		_box.add_child(Kit.place(title, 370, bottom + 44, 270, 96))
 		bottom += 140.0
+	bottom = _tendency(r, bottom)
 	var record: Dictionary = _info["record"]
 	var saved: Variant = record["saved"]
 	if saved is bool and not saved:
 		Title.put(_box, S.SAVE_FAILED, 22, 700, Kit.C_RED, Rect2(40, bottom + 14, 640, 36))
+
+
+# 押す癖の 1 行(v0.2.0)。平均のずれが大きければ、判定のずれをその値にするボタンも出す。下の端を返す。
+func _tendency(r: Dictionary, bottom: float) -> float:
+	var t := Rank.tendency(r.get("diffs", []), int(r.get("offset", 0)))
+	if int(t["n"]) < B.TENDENCY_MIN:
+		return bottom
+	Title.fit(Title.put(_box, S.tendency(int(t["mean_ms"]), int(t["n"])), 22, 500, Kit.C_DIM, Rect2(40, bottom + 12, 640, 34)))
+	bottom += 46.0
+	if t["suggest"] != null:
+		var want := int(t["suggest"])
+		var apply := Kit.button("btn_apply_offset", S.apply_offset(Rank.ms(want)), 28)
+		apply.pressed.connect(func() -> void:
+			_main.save.set_setting("offset_ticks", want)
+			_main.settings_changed()
+			apply.text = S.OFFSET_APPLIED
+			apply.disabled = true)
+		_box.add_child(Kit.place(apply, 80, bottom + 4, 560, 88))
+		bottom += 96.0
+	return bottom
 
 
 # 共有する文字の枠。選べるが、書き換えられない。

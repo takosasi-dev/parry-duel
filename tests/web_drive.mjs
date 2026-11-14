@@ -9,6 +9,8 @@
 //   node tests/web_drive.mjs --flow [key|mouse|touch] [--daily]   タイトル → 対戦 → 合間 → 結果 → コピー → タイトル → 読み込み直し(AC-27・AC-28・保存)。--daily は「今日の3連戦」
 //   node tests/web_drive.mjs --settings           設定を変えて、読み込み直した後も残る(localStorage への保存)
 //   node tests/web_drive.mjs --storage            別のタブ・別のゲームの保存を消さない、v0.1.1 までの保存を引き継ぐ
+//   node tests/web_drive.mjs --drill              型の練習: 型を選んで、本物のキーで繰り返し弾く(v0.2.0)
+//   node tests/web_drive.mjs --pad                ゲームパッド: 偽のパッドで、メニューを選んで押す・対戦で弾く・一時停止(v0.2.0)
 //   node tests/web_drive.mjs --latency [key|mouse|touch] [--gpu]   入力から描画までの時間を、押し 100 回ぶん測る(NFR-2・仕様書 §8.2)
 //   node tests/web_drive.mjs --perf               自動の相手に 60 秒戦わせた 1 フレームの時間(NFR-1。窓なしなので参考値)
 //   node tests/web_drive.mjs --quiet              読み込みの後、3 分間の通信が 0 件(NFR-8・AC-31)
@@ -393,6 +395,8 @@ async function storage(base) {
 			if (!expect(await page.waitState((s) => s.screen === 'settings', 5000) !== null, `${name}: 設定が開く`)) return;
 			await page.clickButton('btn_vol_25');
 			let saved = await waitSaved(page, (v) => v?.settings?.volume === 25);
+			const sf = (await page.state()).save_failed;
+			expect(sf === false, `${name}: 書けた時に「書けなかった」にならない(save_failed: ${sf}。v0.1.2 では毎回 true で、結果の画面に「記録を残せない」が出ていた)`);
 			expect(JSON.stringify(saved?.fixed) === JSON.stringify(old.fixed) && saved?.reached_boss === 3,
 				`${name}: (1) 書くと、引き継いだ記録ごと localStorage に移る(保存: ${JSON.stringify(saved)})`);
 			await sleep(1500); // Godot が /userfs を書き戻すなら、この間に起きる
@@ -409,10 +413,110 @@ async function storage(base) {
 			const OTHER2 = '/userfs/godot/app_userdata/OtherGame/later.json';
 			await page.userfsPut({ [OTHER2]: '{}' });
 			await page.key('Escape');
+			// 設定から戻るとタイトルを作り直す。入る時の動き(0.3 秒)が終わってから押す
+			await page.waitState((st) => st.screen === 'title' && st.buttons?.btn_practice_1, 5000);
+			await sleep(500);
 			await page.clickButton('btn_practice_1');
 			const d = await page.waitState((s) => s.screen === 'duel' && s.duel?.tick > 600, 30000);
 			const keys2 = await page.userfsKeys();
 			expect(d !== null && keys2.includes(OTHER2), `${name}: (2) 対戦を 5 秒動かしても、別のゲームが書いた /userfs の保存が残る(/userfs の鍵 ${keys2.length} 個)`);
+
+			// (4) v0.2.0 から増えた保存(やさしい設定など)は別のキー。公開中の v0.1.2 のタブが本の保存を自分の形で書いても消えない
+			await page.key('Escape');
+			await page.waitState((st) => st.screen === 'pause', 3000);
+			await page.clickButton('btn_pause_settings');
+			await page.waitState((st) => st.screen === 'settings' && st.buttons?.btn_easy_on, 5000);
+			await page.clickButton('btn_easy_on');
+			const ext = await waitSaved({ saved: () => page.savedExt() }, (v) => v?.settings?.easy === true);
+			await page.evaluate(`localStorage.setItem('${SAVE_KEY}', '{"version":1,"fixed":null,"daily":null,"reached_boss":1,"settings":{"volume":75,"shake":true,"reduce_flash":false,"offset_ticks":0}}')`);
+			await page.goto(`${base}?debug=1`);
+			const t2 = await title();
+			const ext2 = await page.savedExt();
+			expect(ext?.settings?.easy === true && ext2?.settings?.easy === true && t2 !== null,
+				`${name}: (4) v0.1.2 のタブが本の保存を書いた後も、やさしい設定は残る(ext: ${JSON.stringify(ext2?.settings)})`);
+			noErrors(page);
+		});
+	}
+}
+
+// 型の練習(v0.2.0): タイトル → 型の練習 → 型を選ぶ(ゆっくり)→ 本物のキーで弾く。体力は減らず、押したずれを数える
+async function drill(base) {
+	for (const name of browsers()) {
+		await withPage(name, `${base}?debug=1`, {}, async (page) => {
+			if (!expect(await page.waitState((s) => s.screen === 'title' && s.buttons?.btn_drill, 30000) !== null, `${name}: タイトルに「型の練習」`)) return;
+			await page.clickButton('btn_drill');
+			const p = await page.waitState((s) => s.screen === 'practice' && s.buttons?.btn_drill_stone_2_b, 5000);
+			if (!expect(p !== null && !p.buttons.btn_drill_boss_2, `${name}: 型の練習の画面。着いていない敵 2 は押せない`)) return;
+			await page.clickButton('btn_drill_slow');
+			await page.clickButton('btn_drill_stone_2_b');
+			const s0 = await page.waitState((s) => s.screen === 'duel' && s.duel?.drill_id === 'stone_2_b', 8000);
+			if (!expect(s0 !== null && s0.duel.speed === 75, `${name}: 選んだ型をゆっくりで始める(${s0?.duel.drill_id} ${s0?.duel.speed})`)) return;
+			const done = new Set();
+			const end = Date.now() + 20000;
+			let s = s0;
+			while (Date.now() < end && (s.duel?.parries ?? 0) < 6) {
+				s = await page.state();
+				for (const a of s.duel?.attacks ?? []) {
+					if (a.kind === 'white' && !done.has(a.id) && s.duel.tick >= a.judged - 4) {
+						done.add(a.id);
+						await page.key('Space');
+					}
+				}
+				await sleep(8);
+			}
+			s = await page.state();
+			expect(s.duel.parries >= 6 && s.duel.diffs >= 6 && s.duel.player_hp === 5 && !s.duel.over,
+				`${name}: 同じ型を繰り返し弾ける。体力は減らず、押したずれを数える(弾いた ${s.duel.parries}、ずれ ${s.duel.diffs}、体力 ${s.duel.player_hp})`);
+			await page.shot('drill');
+			noErrors(page);
+		});
+	}
+}
+
+// ゲームパッド(v0.2.0)。偽のパッド(lib.mjs の FAKE_PAD)を、Godot がいつも読む navigator.getGamepads() に差し込む。
+// 本物のパッドでの手触りは確かめていない(窓なしのブラウザにはパッドが無い)。
+async function pad(base) {
+	for (const name of browsers()) {
+		await withPage(name, `${base}?debug=1`, { pad: true }, async (page) => {
+			if (!expect(await page.waitState((s) => s.screen === 'title' && s.buttons?.btn_fixed, 30000) !== null, `${name}: タイトルが出る`)) return;
+			await page.padPress(0);
+			let s = await page.waitState((st) => st.pad && st.focus === 'btn_fixed', 3000);
+			expect(s !== null && s.screen === 'title', `${name}: 最初の A は選ぶだけ(選んだ物: ${s?.focus})`);
+			await page.padPress(13);
+			s = await page.waitState((st) => st.focus && st.focus !== 'btn_fixed', 3000);
+			expect(s !== null, `${name}: 十字キーの下で次のボタンへ(${s?.focus})`);
+			await page.padPress(12);
+			s = await page.waitState((st) => st.focus === 'btn_fixed', 3000);
+			expect(s !== null, `${name}: 十字キーの上で戻る`);
+			await page.padPress(0);
+			s = await page.waitState((st) => st.screen === 'duel' && st.duel, 5000);
+			if (!expect(s !== null, `${name}: A で「いつもの3連戦」が始まる`)) return;
+			const done = new Set();
+			const end = Date.now() + 25000;
+			while (Date.now() < end && (s.duel?.parries ?? 0) < 2) {
+				s = await page.state();
+				for (const a of s.duel?.attacks ?? []) {
+					if (a.kind === 'white' && !done.has(a.id) && s.duel.tick >= a.judged - 6) {
+						done.add(a.id);
+						await page.padPress(0, 30);
+					}
+				}
+				await sleep(8);
+			}
+			expect(s.duel.parries >= 2, `${name}: 対戦で A を押すと弾く(弾いた ${s.duel.parries})`);
+			expect(s.focus === '', `${name}: 対戦の最中は何も選ばない(${s.focus})`);
+			await page.padPress(9);
+			s = await page.waitState((st) => st.screen === 'pause', 3000);
+			if (!expect(s !== null, `${name}: Start で一時停止`)) return;
+			await sleep(300);
+			s = await page.waitState((st) => st.focus === 'btn_resume', 3000);
+			expect(s !== null, `${name}: 一時停止では「続ける」が選ばれている`);
+			await page.padPress(9);
+			s = await page.waitState((st) => st.screen === 'duel', 3000);
+			expect(s !== null, `${name}: 一時停止で Start を押すと続ける`);
+			await page.mouse(5, 5);
+			s = await page.waitState((st) => !st.pad, 3000);
+			expect(s !== null && s.focus === '', `${name}: マウスを使うと、選んだ印が消える`);
 			noErrors(page);
 		});
 	}
@@ -514,6 +618,8 @@ const MODES = {
 	'--flow': (b) => flow(b, hows('--flow')),
 	'--settings': (b) => settings(b),
 	'--storage': (b) => storage(b),
+	'--drill': (b) => drill(b),
+	'--pad': (b) => pad(b),
 	'--latency': (b) => latency(b, valueOf('--latency') ?? 'key'),
 	'--perf': (b) => perf(b),
 	'--quiet': (b) => quiet(b),

@@ -11,6 +11,7 @@ func _open(mode: int = Duel.Mode.FIXED, boss: int = 1) -> Node:
 	var save_path := ProjectSettings.globalize_path("user://save.json")
 	if FileAccess.file_exists("user://save.json"):
 		DirAccess.remove_absolute(save_path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save_ext.json"))
 	_main = load("res://ui/main.tscn").instantiate()
 	Engine.get_main_loop().root.add_child(_main)
 	if mode == Duel.Mode.PRACTICE:

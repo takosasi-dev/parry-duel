@@ -120,6 +120,24 @@ static func _normalize(raw: Dictionary) -> Array:
 	return bosses
 
 
+# 型の時間を速さ(%)に合わせた写し(v0.2.0)。100 ならそのまま返す。整数の計算だけ(INV-4)で、四捨五入。
+# 型を選んだ後に掛けるので、型の出る順(今日の3連戦の順)は速さで変わらない。
+static func scaled(pattern: Dictionary, speed: int) -> Dictionary:
+	if speed == B.SPEED_NORMAL:
+		return pattern
+	var out := pattern.duplicate(true)
+	out["length"] = scale_ticks(int(out["length"]), speed)
+	for a: Dictionary in out["attacks"]:
+		for k: String in TIME_KEYS:
+			a[k] = scale_ticks(int(a[k]), speed)
+	return out
+
+
+@warning_ignore("integer_division")
+static func scale_ticks(ticks: int, speed: int) -> int:
+	return (ticks * B.SPEED_NORMAL + speed / 2) / speed
+
+
 # 型の中の当たる tick(型の始まりを 0 として)を、早い順に返す。
 static func contacts(pattern: Dictionary) -> Array:
 	var out: Array = []

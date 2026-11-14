@@ -32,6 +32,18 @@ const RESUME_WAIT_TICKS := 120
 const OFFSET_MIN := -12
 const OFFSET_MAX := 12
 
+# v0.2.0(依頼者の決定 2026-11-14): やさしい設定・型の練習・押したずれの表示
+const SPEED_NORMAL := 100  # 攻撃の速さ(%)の基準
+const SPEED_MIN := 50
+const SPEED_MAX := 200
+const EASY_SPEED := 80  # やさしい: 攻撃の速さ(%)。型の時間は 100/80 倍になる
+const EASY_PARRY_WINDOW := 18  # やさしい: 弾くの窓(±tick、150 ms)。押し込みも窓 + 1 に伸びる
+const EASY_JUST_WINDOW := 7  # やさしい: ぴったりの窓(±tick)
+const SLOW_SPEED := 75  # 型の練習の「ゆっくり」
+const NEAR_MISS_TICKS := 36  # 空振りの時、当たる tick がこれより近い白があれば「早すぎ・遅すぎ」を出す
+const TENDENCY_MIN := 8  # 押す癖を出すのに要る数
+const TENDENCY_MIN_TICKS := 2  # 平均のずれがこれ以上(約 17 ms)なら、判定のずれの直しを勧める
+
 # タイミング合わせ(§9.14)
 const CALIB_COUNT := 8
 const CALIB_SKIP := 2

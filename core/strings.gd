@@ -3,7 +3,7 @@
 extends RefCounted
 
 const GAME_NAME := "ParryDuel"
-const VERSION := "v0.1.2"
+const VERSION := "v0.2.0"
 const SHARE_URL := "https://takosasi-dev.github.io/parry-duel/"
 
 # S1 タイトル
@@ -83,6 +83,22 @@ const BTN_RESUME := "続ける"
 const SHARE_DAILY_FIRST := "今日の3連戦・1回目"
 const SHARE_DAILY := "今日の3連戦"
 const SHARE_FIXED := "いつもの3連戦"
+
+# v0.2.0: やさしい設定・押したずれ・型の練習・ゲームパッド
+const EASY := "やさしい"
+const EASY_ON := "やさしい設定で遊ぶ(記録は別)"
+const EASY_HINT := "弾く窓が広く、攻撃が遅くなる。記録は別に残す"
+const SHOW_DIFF := "押したずれを出す"
+const TOO_EARLY := "早すぎ"
+const TENDENCY_OK := "押す癖: ほぼ合っている"
+const OFFSET_APPLIED := "判定のずれを変えた"
+const BTN_DRILL := "型の練習"
+const DRILL := "型の練習"
+const DRILL_GUIDE := "繰り返し練習する型を選ぶ。体力は減らない"
+const SPEED := "速さ"
+const SPEED_NORMAL := "ふつう"
+const SPEED_SLOW := "ゆっくり"
+const HOW_PAD := "パッド: A・RB で弾く / B・LB で避ける / Start で一時停止"
 
 
 static func boss_of(n: int, total: int) -> String:
@@ -169,3 +185,32 @@ static func calib_count(n: int, total: int) -> String:
 
 static func volume(v: int) -> String:
 	return "%d" % v
+
+
+# 押したずれ(ms、負 = 早い)。「早い 25 ms」「遅い 42 ms」。
+static func press_diff(ms: int) -> String:
+	return ("早い %d ms" % -ms) if ms < 0 else ("遅い %d ms" % ms)
+
+
+# 押す癖の 1 行。mean_ms は平均(負 = 早い)、n は数。
+static func tendency(mean_ms: int, n: int) -> String:
+	if absi(mean_ms) < 5:
+		return "%s(%d 回)" % [TENDENCY_OK, n]
+	return "押す癖: 平均 %d ms %s(%d 回)" % [absi(mean_ms), "早い" if mean_ms < 0 else "遅い", n]
+
+
+static func apply_offset(ms: int) -> String:
+	return "判定のずれを %s にする" % signed_ms(ms)
+
+
+# 型の練習の型の名前。「敵 2・段階 3・B」。
+static func drill_name(boss: int, phase: int, letter: String) -> String:
+	return "敵 %d・%s %d・%s" % [boss, PHASE, phase, letter]
+
+
+static func phase_n(n: int) -> String:
+	return "%s %d" % [PHASE, n]
+
+
+static func drill_stats(parries: int, justs: int) -> String:
+	return "弾いた %d / %s %d" % [parries, JUST, justs]

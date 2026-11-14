@@ -8,7 +8,7 @@ const Judge := preload("res://core/judge.gd")
 const PatternStore := preload("res://core/pattern_store.gd")
 const Sequencer := preload("res://core/sequencer.gd")
 
-enum Mode { FIXED, DAILY, PRACTICE }
+enum Mode { FIXED, DAILY, PRACTICE, DRILL }  # DRILL = 型の練習(1 つの型を繰り返す。v0.2.0)
 enum State { INTRO, PATTERN, GAP, STAGGER, RECOVER, WAIT_NEXT, DONE }
 
 var seed_value: int
@@ -17,6 +17,15 @@ var boss: int  # 1〜3
 var phase := 1  # 1〜3
 var tick := 0
 var offset := 0
+
+# 遊び方の違い(v0.2.0)。始めた時に決まり、途中では変わらない
+var speed: int = B.SPEED_NORMAL  # 攻撃の速さ(%)。型の時間は 100/speed 倍
+var parry_window: int = B.PARRY_WINDOW
+var just_window: int = B.JUST_WINDOW
+var push_ticks: int = B.PUSH_TICKS  # 押し込みの長さ。いつも弾くの窓 + 1
+var easy := false  # やさしい設定で始めた回(記録は別枠)
+var drill_id := ""  # 型の練習の型の id。それ以外は ""
+var diffs: Array = []  # 押したずれ(tick、負 = 早い)。弾いた時と、近くの白を空振りした時
 
 var player_hp: int = B.PLAYER_HP
 var lock := 0
@@ -42,6 +51,7 @@ var won := false
 
 var _bosses: Array
 var _seq: Sequencer
+var _drill: Dictionary = {}  # 型の練習の型(元のデータ)
 var _pattern: Dictionary = {}
 var _pattern_start := 0
 var _attacks: Array = []
@@ -51,13 +61,19 @@ var _want_dodge := false
 var _events: Array = []
 
 
-# mode 0 = いつも、1 = 今日、2 = 練習。carry は retry_carry() の値か null。
-# bosses はテスト用(null なら同梱の型)。
-func _init(p_seed: int, p_mode: int, start_boss: int, carry: Variant = null, bosses: Variant = null) -> void:
+# mode 0 = いつも、1 = 今日、2 = 練習、3 = 型の練習。carry は retry_carry() の値か null。
+# bosses はテスト用(null なら同梱の型)。opts は遊び方の違い(どれも省いてよい):
+#   speed(%)・window・just(±tick)・easy(bool)・drill(型の id。mode が DRILL の時だけ見る)
+func _init(p_seed: int, p_mode: int, start_boss: int, carry: Variant = null, bosses: Variant = null, opts: Dictionary = {}) -> void:
 	seed_value = p_seed
 	mode = p_mode
 	boss = clampi(start_boss, 1, B.BOSS_COUNT)
 	_bosses = bosses if bosses is Array else PatternStore.shared()["bosses"]
+	speed = clampi(int(opts.get("speed", B.SPEED_NORMAL)), B.SPEED_MIN, B.SPEED_MAX)
+	parry_window = maxi(int(opts.get("window", B.PARRY_WINDOW)), 1)
+	just_window = clampi(int(opts.get("just", B.JUST_WINDOW)), 0, parry_window)
+	push_ticks = parry_window + 1
+	easy = opts.get("easy", false) == true
 	if carry is Dictionary:
 		hits = int(carry.get("hits", 0))
 		base_ticks = int(carry.get("ticks", 0))
@@ -68,7 +84,27 @@ func _init(p_seed: int, p_mode: int, start_boss: int, carry: Variant = null, bos
 		if done is Array and done.size() == B.BOSS_COUNT:
 			for i in B.BOSS_COUNT:
 				teach_done[i] = done[i] is bool and done[i]
+		var old_diffs: Variant = carry.get("diffs")
+		if old_diffs is Array:
+			diffs = old_diffs.duplicate()
+	if mode == Mode.DRILL:
+		_find_drill(str(opts.get("drill", "")))
 	_seq = _new_sequencer()
+
+
+# 型の練習の型を探し、その型の敵・段階にする。見つからなければ、その敵の練習にする。
+func _find_drill(id: String) -> void:
+	for bi in _bosses.size():
+		for pi in _bosses[bi]["phases"].size():
+			for p: Dictionary in _bosses[bi]["phases"][pi]["patterns"]:
+				if p["id"] == id:
+					drill_id = id
+					boss = bi + 1
+					phase = pi + 1
+					teach_done = [true, true, true]
+					_drill = p
+					return
+	mode = Mode.PRACTICE
 
 
 # 判定のずれ。変えた後に始まる攻撃から効く(飛んでいる攻撃は、始まった時の値のまま)。
@@ -104,13 +140,13 @@ func time_ticks() -> int:
 
 func result() -> Dictionary:
 	return {"won": won, "mode": mode, "boss": boss, "hits": hits, "ticks": time_ticks(),
-		"justs": justs, "parries": parries, "retries": retries}
+		"justs": justs, "parries": parries, "retries": retries, "easy": easy, "diffs": diffs.duplicate(), "offset": offset}
 
 
 # 負けて「この敵からやり直す」の時に、次の Duel へ渡す値(E-13)。
 func retry_carry() -> Dictionary:
 	return {"hits": hits, "ticks": time_ticks(), "justs": justs, "parries": parries,
-		"retries": retries + 1, "teach_done": teach_done.duplicate()}
+		"retries": retries + 1, "teach_done": teach_done.duplicate(), "diffs": diffs.duplicate()}
 
 
 # 描画用。attacks は { id, start, contact, kind, arm, windup, travel1, hold, travel2, free, pushed, offset } の配列(読むだけ)。
@@ -122,6 +158,7 @@ func snapshot() -> Dictionary:
 		"freeze_ticks": freeze_ticks, "hits": hits, "justs": justs, "parries": parries, "combo": combo,
 		"retries": retries, "time_ticks": time_ticks(), "teaching": not teach_done[boss - 1],
 		"pattern_id": _pattern.get("id", ""), "attacks": _attacks, "over": over, "won": won,
+		"speed": speed, "easy": easy, "drill_id": drill_id,
 	}
 
 
@@ -183,6 +220,8 @@ func _enter(new_state: int, ticks: int) -> void:
 
 
 func _new_sequencer() -> Sequencer:
+	if not _drill.is_empty():  # 型の練習: その型だけ(2 回目からは腕の入れ替えがある)
+		return Sequencer.new(seed_value, boss, phase, [_drill], true)
 	return Sequencer.new(seed_value, boss, phase, _bosses[boss - 1]["phases"][phase - 1]["patterns"], teach_done[boss - 1])
 
 
@@ -206,11 +245,14 @@ func _parry() -> void:
 	if state == State.STAGGER:
 		_counter()
 		return
-	var i := Judge.parry_target(_attacks, tick)
+	var i := Judge.parry_target(_attacks, tick, parry_window)
 	if i == -1:
 		lock = B.WHIFF_LOCK
 		combo = 0
-		_emit("parry_whiff")
+		var near: Variant = Judge.nearest_white(_attacks, tick, B.NEAR_MISS_TICKS)
+		if near != null:
+			diffs.append(near)
+		_emit("parry_whiff", {"near": near})
 		return
 	var a: Dictionary = _attacks[i]
 	if a["kind"] == "red":  # 弾けない。赤は残る(E-4)
@@ -219,13 +261,15 @@ func _parry() -> void:
 		_emit("parry_red", {"attack": a})
 		return
 	var diff := tick - Judge.judged_tick(a["contact"], a["offset"])
-	var grade := Judge.grade(diff)
+	var grade := Judge.grade(diff, parry_window, just_window)
 	_attacks.remove_at(i)
 	parries += 1
 	combo += 1
+	diffs.append(diff)
 	if grade == Judge.Grade.JUST:
 		justs += 1
-	stagger = mini(stagger + Judge.stagger_gain(grade), B.STAGGER_THRESHOLD)
+	if mode != Mode.DRILL:  # 型の練習では、よろけを溜めない(同じ型を繰り返す)
+		stagger = mini(stagger + Judge.stagger_gain(grade), B.STAGGER_THRESHOLD)
 	_emit("parry", {"just": grade == Judge.Grade.JUST, "attack": a, "combo": combo, "diff": diff})
 	if a["free"]:
 		_teach_clear()
@@ -288,7 +332,7 @@ func _advance_boss() -> void:
 
 func _start_pattern() -> void:
 	var picked := _seq.next()
-	_pattern = picked["pattern"]
+	_pattern = PatternStore.scaled(picked["pattern"], speed)
 	_pattern_start = tick
 	_enter(State.PATTERN, _pattern["length"])
 	_emit("pattern_start", {"id": _pattern["id"], "teach": _pattern["teach"], "swapped": picked["swapped"]})
@@ -298,7 +342,7 @@ func _spawn(def: Dictionary) -> void:
 	var a := {
 		"id": _next_id, "start": tick, "contact": Attack.contact_tick(def, tick), "kind": def["kind"], "arm": def["arm"],
 		"windup": def["windup"], "travel1": def["travel1"], "hold": def["hold"], "travel2": def["travel2"],
-		"free": _pattern["teach"], "pushed": false, "offset": offset,
+		"free": _pattern["teach"] and mode != Mode.DRILL, "pushed": false, "offset": offset,
 	}
 	_next_id += 1
 	_attacks.append(a)
@@ -310,7 +354,7 @@ func _resolve_attacks() -> void:
 	var i := 0
 	while i < _attacks.size():
 		var a: Dictionary = _attacks[i]
-		var due := Judge.due(a, tick, dodge_ticks, hurt_ticks)
+		var due := Judge.due(a, tick, dodge_ticks, hurt_ticks, push_ticks)
 		if due == Judge.Due.NONE:
 			i += 1
 			continue
@@ -332,6 +376,11 @@ func _resolve_attacks() -> void:
 
 func _hit(a: Dictionary) -> void:
 	if a["free"]:  # 教える型の間は減らない(E-6)
+		_emit("hurt_free", {"attack": a})
+		return
+	if mode == Mode.DRILL:  # 型の練習: 受けた数は数えるが、体力は減らさず、当たらない時間も作らない
+		hits += 1
+		combo = 0
 		_emit("hurt_free", {"attack": a})
 		return
 	player_hp -= 1

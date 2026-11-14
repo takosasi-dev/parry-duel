@@ -21,6 +21,7 @@ func _boot() -> Node:
 	if _last != null and is_instance_valid(_last):
 		_last.free()  # 前のテストが途中で止まった時の残り
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save.json"))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save_ext.json"))
 	var main: Node = load("res://ui/main.tscn").instantiate()
 	Engine.get_main_loop().root.add_child(main)
 	_last = main
@@ -488,7 +489,7 @@ func test_buttons_are_tall_and_do_not_overlap() -> bool:
 			ok(b.position.x >= 0.0 and b.position.x + b.size.x <= 720.0, "%s の %s は画面の中" % [pair[0], b.name])
 			for other: Button in buttons:
 				ok(other == b or not b.get_rect().intersects(other.get_rect()), "%s の %s と %s が重ならない" % [pair[0], b.name, other.name])
-	eq(n, 6 + 13 + 1 + 3 + 3, "ボタンは全部で 26 個")
+	eq(n, 7 + 17 + 1 + 3 + 3, "ボタンは全部で 31 個(v0.2.0 でタイトルに型の練習、設定に 2 行)")
 	main.free()
 	return true
 

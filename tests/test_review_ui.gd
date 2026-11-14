@@ -12,6 +12,7 @@ func _boot() -> Node:
 	if _main != null and is_instance_valid(_main):
 		_main.free()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save.json"))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://save_ext.json"))
 	_root = Engine.get_main_loop().root
 	_main = load("res://ui/main.tscn").instantiate()
 	_root.add_child(_main)

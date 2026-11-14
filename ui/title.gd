@@ -138,12 +138,15 @@ func _ready() -> void:
 		y += 28.0
 	if _load_failed:
 		put(_box, S.SAVE_BROKEN, 20, 500, Kit.C_SPARK, Rect2(40, y, 640, 30))
+	var easy: bool = _main.save.settings()["easy"] == true
+	if easy:  # 記録の行も、やさしい設定の記録になる
+		put(_box, S.EASY_ON, 20, 700, Kit.C_SPARK, Rect2(80, 548, 560, 32))
 
 	var fixed := Kit.button("btn_fixed", S.BTN_FIXED, 40, "primary")
 	fixed.disabled = not _data_ok
 	fixed.pressed.connect(_start.bind(Duel.Mode.FIXED))
 	_box.add_child(Kit.place(fixed, 80, 586, 560, 120))
-	var best: Variant = _main.save.fixed_best()
+	var best: Variant = _main.save.fixed_best(easy)
 	if best is Dictionary:
 		put(_box, S.best_line(int(best["hits"]), Rank.seconds_text(int(best["ticks"]))), 22, 500, Kit.C_DIM, Rect2(80, 710, 560, 34))
 
@@ -153,7 +156,7 @@ func _ready() -> void:
 	daily.pressed.connect(_start.bind(Duel.Mode.DAILY))
 	_box.add_child(Kit.place(daily, 80, 764, 560, 120))
 	put(daily, str(today["date"]), 20, 500, Kit.C_DIM, Rect2(404, 0, 136, 120), HORIZONTAL_ALIGNMENT_RIGHT)
-	put(_box, _daily_line(_main.save.daily(int(today["day"]))), 22, 500, Kit.C_DIM, Rect2(80, 888, 560, 34))
+	put(_box, _daily_line(_main.save.daily(int(today["day"]), easy)), 22, 500, Kit.C_DIM, Rect2(80, 888, 560, 34))
 
 	put(_box, S.BTN_PRACTICE, 28, 700, Kit.C_TEXT, Rect2(80, 948, 96, 88), HORIZONTAL_ALIGNMENT_LEFT)
 	var reached: int = _main.save.reached_boss()
@@ -166,9 +169,13 @@ func _ready() -> void:
 		put(b, S.boss_n(n), 28, 700, ink, Rect2(58, 0, 78, 88))
 		b.draw.connect(func() -> void: mark(b, n, Vector2(36, 44), 14.0, ink if b.disabled else Kit.boss_color(n)))
 
+	var drill := Kit.button("btn_drill", S.BTN_DRILL, 30)
+	drill.disabled = not _data_ok
+	drill.pressed.connect(func() -> void: _main.open_practice())
+	_box.add_child(Kit.place(drill, 80, 1078, 270, 88))
 	var settings := Kit.button("btn_settings", S.BTN_SETTINGS, 30, "quiet")
 	settings.pressed.connect(func() -> void: _main.open_settings())
-	_box.add_child(Kit.place(settings, 220, 1078, 280, 88))
+	_box.add_child(Kit.place(settings, 370, 1078, 270, 88))
 	put(_box, S.VERSION, 20, 500, Kit.C_DIM, Rect2(24, 1228, 200, 32), HORIZONTAL_ALIGNMENT_LEFT)
 
 

@@ -28,3 +28,21 @@ static func seconds_text(ticks: int) -> String:
 # tick を ms に直す(四捨五入)。表示専用。
 static func ms(ticks: int) -> int:
 	return roundi(ticks * 1000.0 / B.TICK_HZ)
+
+
+# 押す癖(v0.2.0)。diffs は押したずれ(tick、負 = 早い)、offset はその回の判定のずれ(tick)。
+# { n, mean_ms, suggest }。suggest は、平均のずれが 0 に近づく判定のずれ(tick)。数が足りない・ずれが小さい・今と同じなら null。
+static func tendency(diffs: Array, offset: int) -> Dictionary:
+	var n := diffs.size()
+	if n < B.TENDENCY_MIN:
+		return {"n": n, "mean_ms": 0, "suggest": null}
+	var sum := 0
+	for d: Variant in diffs:
+		sum += int(d)
+	var mean_ticks := roundi(float(sum) / n)
+	var suggest: Variant = null
+	if absi(mean_ticks) >= B.TENDENCY_MIN_TICKS:
+		var want := clampi(offset + mean_ticks, B.OFFSET_MIN, B.OFFSET_MAX)
+		if want != offset:
+			suggest = want
+	return {"n": n, "mean_ms": roundi(sum * 1000.0 / (n * B.TICK_HZ)), "suggest": suggest}

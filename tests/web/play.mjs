@@ -161,6 +161,8 @@ export async function playFlow(page, how, url, daily = false) {
 	// 記録が、ブラウザの中の保存(localStorage)に届いている。時間は、やり直しが無ければ対戦の tick と同じ
 	const saved = await waitSaved(page, record);
 	const f = record(saved) ?? {};
+	const failedFlag = (await page.state()).save_failed;
+	expect(failedFlag === false, `${n}: 記録を書けた時に、結果の画面に「記録を残せない」を出さない(save_failed: ${failedFlag})`);
 	expect(f.hits === d.hits && (daily || (f.justs === d.justs && f.retries === d.retries)) && (retries > 0 || f.ticks === d.tick) && saved?.reached_boss === 3,
 		`${n}: 記録が保存に届いた(保存: ${JSON.stringify(daily ? saved?.daily : saved?.fixed)} 着いた敵 ${saved?.reached_boss} / 対戦: 受けた数 ${d.hits} 時間 ${d.tick} tick ぴったり ${d.justs})`);
 

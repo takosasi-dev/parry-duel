@@ -82,7 +82,7 @@ async function fullRun(page, base, taken, snap) {
 	const title = await page.waitState((s) => s.screen === 'title' && s.buttons?.btn_settings, 30000);
 	if (!expect(title !== null, 'shots: タイトルが出る')) return;
 	// 後で ?debug=1 なしで押す場所を、今のうちに覚える(並びは同じ)
-	const at = { settings: await page.toCss(title, ...title.buttons.btn_settings) };
+	const at = { settings: await page.toCss(title, ...title.buttons.btn_settings), drill: await page.toCss(title, ...title.buttons.btn_drill) };
 	await page.clickButton('btn_settings');
 	const set = await page.waitState((s) => s.screen === 'settings' && s.buttons?.btn_calib, 5000);
 	if (!expect(set !== null, 'shots: 設定が開く')) return;
@@ -126,7 +126,14 @@ async function fullRun(page, base, taken, snap) {
 	await page.mouse(...at.calib);
 	await sleep(2600);
 	await snap('calib');
-	for (const label of ['title', 'settings', 'calib']) copyFileSync(taken[label], path.join(DOCS, `${label}.png`));
+	// 型の練習の画面(3 体を倒した後なので、敵 3 まで選べる)
+	await page.goto(base);
+	await page.evaluate('1');
+	await sleep(1500);
+	await page.mouse(...at.drill);
+	await sleep(800);
+	await snap('practice');
+	for (const label of ['title', 'settings', 'calib', 'practice']) copyFileSync(taken[label], path.join(DOCS, `${label}.png`));
 	for (const [label, file] of [['pause', 'pause'], ['interval_1', 'interval'], ['result_copied', 'result']]) await remake(page, taken[label], path.join(DOCS, `${file}.png`), { keep: KEEP });
 }
 

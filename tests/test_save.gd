@@ -13,14 +13,15 @@ func _write(text: String) -> void:
 
 
 func _clean() -> void:
-	if FileAccess.file_exists(PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	for f: String in [PATH, "user://test_save_ext.json"]:
+		if FileAccess.file_exists(f):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(f))
 
 
 func _is_default(s: SaveStore) -> void:
 	eq(s.fixed_best(), null, "記録なし")
 	eq(s.reached_boss(), 1, "着いた敵 1")
-	eq(s.settings(), {"volume": 75, "shake": true, "reduce_flash": false, "offset_ticks": 0}, "設定の既定値")
+	eq(s.settings(), {"volume": 75, "shake": true, "reduce_flash": false, "offset_ticks": 0, "easy": false, "show_diff": true}, "設定の既定値")
 
 
 func test_no_file_is_default_without_warning() -> bool:
@@ -58,7 +59,7 @@ func test_ac26_unknown_version_keeps_settings() -> bool:
 	eq(s.fixed_best(), null, "記録は初めから")
 	eq(s.reached_boss(), 1, "着いた敵も初めから")
 	eq(s.daily(5)["first"], null, "今日の記録も初めから")
-	eq(s.settings(), {"volume": 25, "shake": false, "reduce_flash": true, "offset_ticks": -3}, "設定は引き継ぐ")
+	eq(s.settings(), {"volume": 25, "shake": false, "reduce_flash": true, "offset_ticks": -3, "easy": false, "show_diff": true}, "設定は引き継ぐ")
 	ok(not s.load_failed, "読めなかった扱いにはしない")
 	_clean()
 	return true

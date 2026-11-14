@@ -12,6 +12,8 @@ static func build(date: String, mode: int, first_today: bool, result: Dictionary
 	var label := S.SHARE_FIXED
 	if mode == Duel.Mode.DAILY:
 		label = S.SHARE_DAILY_FIRST if first_today else S.SHARE_DAILY
+	if result.get("easy", false) == true:
+		label += "・" + S.EASY
 	var n := int(result["hits"])
 	var hits := S.hits(n) + ("(%s)" % S.UNHURT if n == 0 else "")
 	return "%s %s(%s)\n%s / %s / %s / %s\n%s" % [

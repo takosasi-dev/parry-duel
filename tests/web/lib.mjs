@@ -14,6 +14,7 @@ export const WEB = process.env.PD_WEB ? path.resolve(process.env.PD_WEB) : path.
 export const inBuild = (resPath) => readFileSync(path.join(WEB, 'index.pck')).includes(resPath);
 export const OUT = path.join(ROOT, 'build', 'web_shots');
 export const SAVE_KEY = 'parry-duel/save'; // save/save_store.gd の WEB_KEY
+export const SAVE_KEY_EXT = 'parry-duel/ext'; // save/save_store.gd の WEB_KEY_EXT
 // 何人かで同時に動かす時は、環境変数でポートをずらす
 const HTTP_PORT = Number(process.env.PD_HTTP_PORT || 8791);
 const CDP_PORT = Number(process.env.PD_CDP_PORT || 9791);
@@ -37,6 +38,13 @@ const KEYS = {
 	ShiftLeft: { key: 'Shift', code: 'ShiftLeft', windowsVirtualKeyCode: 16, location: 1 },
 	ShiftRight: { key: 'Shift', code: 'ShiftRight', windowsVirtualKeyCode: 16, location: 2 },
 };
+
+const FAKE_PAD = `(() => {
+	const pad = { index: 0, id: 'Fake Pad (STANDARD GAMEPAD)', mapping: 'standard', connected: true, timestamp: 0,
+		buttons: Array.from({ length: 17 }, () => ({ value: 0, pressed: false, touched: false })), axes: [0, 0, 0, 0] };
+	window.__pad = pad;
+	navigator.getGamepads = () => [pad, null, null, null];
+})();`;
 
 let failures = 0;
 export function expect(ok, label) {
@@ -97,7 +105,9 @@ export function serve() {
 }
 
 // ブラウザを 1 つ立てて、ページを開く。gpu を真にすると、ソフト描画でなく本物の GPU を使わせてみる。
-export async function open(name, url, { metrics = PHONE, touch = false, gpu = false } = {}) {
+// pad を真にすると、偽のゲームパッド(標準の並び)を 1 つつなぐ。Godot は navigator.getGamepads() を毎フレーム読むので、
+// それを差し替える。押すのは page.padPress(ボタンの番号)。0 = A、1 = B、4 = LB、5 = RB、9 = Start、12〜15 = 十字キー(上下左右)
+export async function open(name, url, { metrics = PHONE, touch = false, gpu = false, pad = false } = {}) {
 	const exe = BROWSERS[name];
 	if (!existsSync(exe)) return null;
 	mkdirSync(OUT, { recursive: true });
@@ -137,6 +147,7 @@ export async function open(name, url, { metrics = PHONE, touch = false, gpu = fa
 	await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
 	if (touch) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
 	await cdp.send('Emulation.setDeviceMetricsOverride', metrics);
+	if (pad) await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: FAKE_PAD });
 	const t0 = Date.now();
 	await cdp.send('Page.navigate', { url });
 	const booted = await waitFor(() => logs.some((l) => l.text.startsWith('Godot Engine v')), BOOT_TIMEOUT_MS, 50);
@@ -157,6 +168,8 @@ export async function open(name, url, { metrics = PHONE, touch = false, gpu = fa
 		},
 		// ブラウザの中の保存(localStorage の parry-duel/save。save/save_store.gd)を読む。無ければ null
 		saved: async () => JSON.parse(await evaluate(`localStorage.getItem('${SAVE_KEY}')`) ?? 'null'),
+		// v0.2.0 から増えた保存(parry-duel/ext。やさしい設定・その記録・押したずれを出すか)
+		savedExt: async () => JSON.parse(await evaluate(`localStorage.getItem('${SAVE_KEY_EXT}')`) ?? 'null'),
 		// IndexedDB の /userfs(Godot の user:// の実体。同じサイトの Godot のゲーム全部で 1 つ)にある鍵の一覧
 		userfsKeys: async () => JSON.parse(await evaluate(`(async () => {
 			if (!(await indexedDB.databases()).some((d) => d.name === '/userfs')) return '[]';
@@ -201,6 +214,13 @@ export async function open(name, url, { metrics = PHONE, touch = false, gpu = fa
 		// repeat を真にすると、押しっぱなしのくり返し(ブラウザの keydown の repeat)として届く
 		keyDown: (k, repeat = false) => cdp.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...KEYS[k], text: undefined, autoRepeat: repeat }),
 		keyUp: (k) => cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...KEYS[k], text: undefined }),
+		// 偽のパッドのボタンを押して離す(Godot が読めるよう、押したまま 2〜3 フレーム待つ)
+		padPress: async (button, holdMs = 60) => {
+			await evaluate(`window.__pad.buttons[${button}].value = 1; window.__pad.buttons[${button}].pressed = true;`);
+			await sleep(holdMs);
+			await evaluate(`window.__pad.buttons[${button}].value = 0; window.__pad.buttons[${button}].pressed = false;`);
+			await sleep(holdMs);
+		},
 		key: async (k) => {
 			await page.keyDown(k);
 			await page.keyUp(k);

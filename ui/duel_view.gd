@@ -14,6 +14,7 @@ const Duel := preload("res://core/duel.gd")
 const S := preload("res://core/strings.gd")
 const Kit := preload("res://ui/kit.gd")
 const Fx := preload("res://ui/fx.gd")
+const Rank := preload("res://core/rank.gd")
 
 const HIDDEN_DELTA := 0.25  # これより長い 1 フレームは「裏にいた」と見て一時停止にする(E-10)
 const PAUSE_RECT := Rect2(24, 24, 88, 88)
@@ -45,6 +46,8 @@ var _after_freeze: Array = []  # 止めが明けた時に始める演出
 var _freeze_t := 0.0  # 止め(12 tick)の残りの秒。敵を倒した時は sim が止まるので、実時間で数える
 var _lose_box: Control
 var _pause_btn: Button
+var _show_diff := true  # 押したずれを出す(設定)
+var _trig := {}  # パッドの引き金(軸)を押し込んでいるか。押し込んだ時だけ 1 回に数える
 
 
 func _ready() -> void:
@@ -88,6 +91,7 @@ func start(d: Duel, settings: Dictionary) -> void:
 
 
 func apply_settings(settings: Dictionary) -> void:
+	_show_diff = settings.get("show_diff", true) == true
 	_fx.shake_enabled = settings["shake"]
 	_fx.reduce_flash = settings["reduce_flash"]
 	if duel != null:
@@ -123,6 +127,11 @@ func resume() -> void:
 	_acc = 0.0
 
 
+# 負けて「この敵からやり直す」が出ている。
+func lost() -> bool:
+	return _lose_box.visible
+
+
 func is_playing() -> bool:
 	return duel != null and not duel.over and duel.state != Duel.State.WAIT_NEXT and not _lose_box.visible
 
@@ -152,6 +161,25 @@ func _input(event: InputEvent) -> void:
 			KEY_R:
 				if _lose_box.visible:
 					retry_requested.emit()
+	elif event is InputEventJoypadButton:
+		if not event.pressed or _lose_box.visible:
+			return  # 負けた後の 2 つのボタンは、main がメニューと同じに選ばせる
+		match event.button_index:
+			JOY_BUTTON_A, JOY_BUTTON_RIGHT_SHOULDER, JOY_BUTTON_X:
+				_press(true)
+			JOY_BUTTON_B, JOY_BUTTON_LEFT_SHOULDER:
+				_press(false)
+			JOY_BUTTON_START:
+				if is_playing() and not paused:
+					pause_requested.emit()
+					get_viewport().set_input_as_handled()
+	elif event is InputEventJoypadMotion:
+		# 引き金: 右 = 弾く、左 = 避ける。半分を越えた時に 1 回
+		if event.axis == JOY_AXIS_TRIGGER_RIGHT or event.axis == JOY_AXIS_TRIGGER_LEFT:
+			var down: bool = event.axis_value > 0.5
+			if down and not _trig.get(event.axis, false):
+				_press(event.axis == JOY_AXIS_TRIGGER_RIGHT)
+			_trig[event.axis] = down
 	elif event is InputEventScreenTouch:
 		if event.pressed:
 			_pointer(event.position)
@@ -276,8 +304,12 @@ func _on_event(e: Dictionary) -> void:
 				_fx.flash(c, 70.0, 110.0, Kit.C_WHITE, 0.3)
 				_fx.shake(2.0, 60.0)
 				Sfx.play("parry", semis)
+				if _show_diff:  # ぴったりでない時だけ、どちらへ外れたかを出す(v0.2.0)
+					_fx.popup(c + Vector2(0, -64), S.press_diff(Rank.ms(int(e["diff"]))), 26, Kit.C_TEXT, 500.0)
 		"parry_whiff":
 			_whiff_t = 0.3
+			if _show_diff and e.get("near") != null:  # 近くの白より早く押した
+				_fx.popup(Vector2(360, B.LINE_Y - 70), S.TOO_EARLY, 30, Kit.C_TEXT, 500.0)
 			# 反撃の直後の押し(止めの間に覚えた入力。E-8)は、空振りの音で水を差さない。硬直の見た目は出す
 			if _since_counter > 0.5:
 				Sfx.play("whiff")
@@ -440,7 +472,10 @@ func _draw() -> void:
 	elif state == Duel.State.INTRO:
 		var k := float(tick - int(s["state_from"])) / B.INTRO_TICKS
 		var a2 := clampf(minf(k * 5.0, (1.0 - k) * 3.0), 0.0, 1.0)
-		Kit.text(self, Vector2(360, 760), S.boss_of(boss, B.BOSS_COUNT), 72, Color(Kit.C_TEXT, a2), 900)
+		if duel.mode == Duel.Mode.DRILL:
+			Kit.text(self, Vector2(360, 760), _drill_name(), 52, Color(Kit.C_TEXT, a2), 900)
+		else:
+			Kit.text(self, Vector2(360, 760), S.boss_of(boss, B.BOSS_COUNT), 72, Color(Kit.C_TEXT, a2), 900)
 
 	if resume_left > 0.0:
 		var total := float(B.RESUME_WAIT_TICKS) / B.TICK_HZ
@@ -572,9 +607,22 @@ func _draw_hud(s: Dictionary) -> void:
 		var c := PAUSE_RECT.get_center()
 		draw_rect(Rect2(c.x - 13, c.y - 16, 9, 32), Kit.C_DIM)
 		draw_rect(Rect2(c.x + 4, c.y - 16, 9, 32), Kit.C_DIM)
-	Kit.text(self, Vector2(134, 66), S.boss_of(s["boss"], B.BOSS_COUNT), 28, Kit.C_TEXT, 700, HORIZONTAL_ALIGNMENT_LEFT, 300.0)
 	var hits: int = s["hits"]
 	Kit.text(self, Vector2(696, 66), S.hits_or_unhurt(hits), 28, Kit.C_PLAYER if hits == 0 else Kit.C_TEXT, 700, HORIZONTAL_ALIGNMENT_RIGHT, 300.0)
+	if s["drill_id"] != "":
+		# 型の練習: 型の名前と、弾いた数。段階とよろけは出さない(溜まらない)
+		Kit.text(self, Vector2(134, 66), _drill_name(), 26, Kit.C_TEXT, 700, HORIZONTAL_ALIGNMENT_LEFT, 380.0)
+		var sub := S.drill_stats(int(s["parries"]), int(s["justs"]))
+		if int(s["speed"]) == B.SLOW_SPEED:
+			sub += "  " + S.SPEED_SLOW
+		if s["easy"]:
+			sub += "  " + S.EASY
+		Kit.text(self, Vector2(134, 122), sub, 22, Kit.C_DIM, 500, HORIZONTAL_ALIGNMENT_LEFT, 560.0)
+		_draw_guide(s)
+		return
+	Kit.text(self, Vector2(134, 66), S.boss_of(s["boss"], B.BOSS_COUNT), 28, Kit.C_TEXT, 700, HORIZONTAL_ALIGNMENT_LEFT, 300.0)
+	if s["easy"]:
+		Kit.text(self, Vector2(246, 66), S.EASY, 22, Kit.C_SPARK, 700, HORIZONTAL_ALIGNMENT_LEFT, 200.0)
 	# 段階(残っている体力の数だけ塗る)
 	Kit.text(self, Vector2(134, 122), S.PHASE, 22, Kit.C_DIM, 500, HORIZONTAL_ALIGNMENT_LEFT, 100.0)
 	var col := Kit.boss_color(s["boss"])
@@ -594,10 +642,19 @@ func _draw_hud(s: Dictionary) -> void:
 			draw_rect(r, Kit.C_SPARK.lerp(Kit.C_WHITE, 0.6 * pulse) if full else Kit.C_SPARK)
 		else:
 			draw_rect(r, Color(Kit.C_DIM, 0.5), false, 2.0)
-	# 左右の半分の案内。いつも出す。最初の敵と教える型の間ははっきり、ほかはうすく
-	var k := 1.0 if int(s["boss"]) == 1 or s["teaching"] else 0.45
+	_draw_guide(s)
+
+
+# 左右の半分の案内。いつも出す。最初の敵と教える型の間と、型の練習ははっきり、ほかはうすく
+func _draw_guide(s: Dictionary) -> void:
+	var k := 1.0 if int(s["boss"]) == 1 or s["teaching"] or s["drill_id"] != "" else 0.45
 	draw_line(Vector2(360, 1200), Vector2(360, 1272), Color(Kit.C_DIM, 0.5 * k), 2.0)
 	Kit.text(self, Vector2(180, 1232), S.DODGE, 28, Color(Kit.C_TEXT, k), 700)
 	Kit.text(self, Vector2(180, 1262), S.KEYS_DODGE, 20, Color(Kit.C_DIM, k), 500)
 	Kit.text(self, Vector2(540, 1232), S.PARRY, 28, Color(Kit.C_TEXT, k), 700)
 	Kit.text(self, Vector2(540, 1262), S.KEYS_PARRY, 20, Color(Kit.C_DIM, k), 500)
+
+
+# 型の練習の型の名前(「敵 2・段階 3・B」)。
+func _drill_name() -> String:
+	return S.drill_name(duel.boss, duel.phase, duel.drill_id.get_slice("_", duel.drill_id.get_slice_count("_") - 1).to_upper())

@@ -15,7 +15,7 @@ const Debug := preload("res://ui/debug.gd")
 
 const SCREENS := {
 	"title": "res://ui/title.gd", "interval": "res://ui/interval.gd", "result": "res://ui/result.gd",
-	"settings": "res://ui/settings.gd", "pause": "res://ui/pause.gd",
+	"settings": "res://ui/settings.gd", "pause": "res://ui/pause.gd", "practice": "res://ui/practice.gd",
 }
 
 var save: SaveStore
@@ -25,7 +25,9 @@ var view: DuelView
 var calib_view: CalibView = null
 var debug: Debug = null
 var screen_name := ""
-var run := {}  # 今の回: { mode, boss(練習で選んだ敵), y, m, d, day, date }
+var run := {}  # 今の回: { mode, boss(練習で選んだ敵), y, m, d, day, date, seed, opts }
+var drill_slow := false  # 型の練習の「ゆっくり」(この回の間だけ覚える)
+var pad := false  # ゲームパッドで操作している間は真。ボタンを選べる(focus)ようにする
 
 var _back: Node2D
 var _screen: Control = null  # タイトル・合間・結果のどれか
@@ -88,8 +90,92 @@ func _draw_back() -> void:
 
 func _input(event: InputEvent) -> void:
 	# 音は、最初の操作の後から鳴らす(FR-29)
-	if (event is InputEventKey or event is InputEventMouseButton or event is InputEventScreenTouch) and event.pressed:
+	if (event is InputEventKey or event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventJoypadButton) and event.pressed:
 		Sfx.unlock()
+	if event is InputEventJoypadButton and event.pressed:
+		_pad_input(event)
+	elif (event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventKey) and event.pressed and pad:
+		_set_pad(false)
+
+
+# ゲームパッド(v0.2.0)。メニューでは十字キー・左スティックでボタンを選び(Godot の ui_up など)、A で押す。
+# Godot 4.7 の ui_accept にパッドの A は入っていないので、A はここで選んだボタンを押す。
+# B は「戻る」、一時停止の Start は「続ける」。どちらも Esc と同じに扱う(一番上の画面の Esc の受け口を通す)。
+func _pad_input(event: InputEventJoypadButton) -> void:
+	var was := pad
+	pad = true
+	if _playing():
+		return  # 対戦の弾く・避ける・一時停止は duel_view が受ける
+	if not was or get_viewport().gui_get_focus_owner() == null:
+		# パッドに替えた時と、画面が替わった後の最初の押しは、ボタンを選ぶだけ(いきなり押さない)
+		_apply_focus()
+		get_viewport().set_input_as_handled()
+		return
+	if event.button_index == JOY_BUTTON_A:
+		var f := get_viewport().gui_get_focus_owner()
+		if f is BaseButton and not f.disabled:
+			get_viewport().set_input_as_handled()
+			f.pressed.emit()
+		return
+	var back: bool = event.button_index == JOY_BUTTON_B or (event.button_index == JOY_BUTTON_START and screen_name == "pause")
+	var top := _top()
+	if back and top != null and top.has_method("_input"):
+		get_viewport().set_input_as_handled()
+		var esc := InputEventKey.new()
+		esc.pressed = true
+		esc.keycode = KEY_ESCAPE
+		esc.physical_keycode = KEY_ESCAPE
+		top._input(esc)  # 一番上の画面の Esc の受け口へ
+
+
+# 対戦を遊んでいる最中か(負けた後の 2 つのボタンが出ている時は違う)。
+func _playing() -> bool:
+	return screen_name == "duel" and not view.lost()
+
+
+func _set_pad(on: bool) -> void:
+	pad = on
+	_apply_focus()
+
+
+# パッドの間は、見えている画面のボタンを選べるようにし、何も選ばれていなければ最初のボタンを選ぶ。
+# マウス・タッチ・キーに戻ったら選べないようにする(クリックの後に選んだ印が残らないように)。
+# 対戦の最中は選ばない(A で弾いた時に、選んだ一時停止ボタンまで押されないように)。
+func _apply_focus() -> void:
+	var allow := pad and not _playing()
+	var first: Button = null
+	for b: Button in _buttons(stage, []):
+		b.focus_mode = Control.FOCUS_ALL if allow else Control.FOCUS_NONE
+		if first == null and b.is_visible_in_tree() and not b.disabled:
+			first = b
+	if not allow:
+		get_viewport().gui_release_focus()
+	elif first != null and get_viewport().gui_get_focus_owner() == null:
+		first.grab_focus()
+
+
+# 一番上の画面のボタン(下に重なった画面のボタンは選ばない)。
+func _buttons(node: Node, out: Array) -> Array:
+	var top := _top()
+	if top == null:
+		top = view if view.visible else node
+	_collect_buttons(top, out)
+	return out
+
+
+# 一番上に開いている画面(タイミング合わせ・設定・一時停止・タイトルなど)。対戦だけの時は null。
+func _top() -> Node:
+	for c: Variant in [calib_view, _settings, _pause, _screen]:
+		if c != null and is_instance_valid(c) and not c.is_queued_for_deletion():
+			return c
+	return null
+
+
+static func _collect_buttons(node: Node, out: Array) -> void:
+	for c: Node in node.get_children():
+		if c is Button:
+			out.append(c)
+		_collect_buttons(c, out)
 
 
 func _notification(what: int) -> void:
@@ -130,6 +216,7 @@ func settings_changed() -> void:
 
 
 func _clear_screens() -> void:
+	get_viewport().gui_release_focus()  # 消える画面のボタンを選んだままにしない
 	for c: Variant in [_screen, _pause, _settings, calib_view]:
 		if c != null and is_instance_valid(c):
 			c.queue_free()
@@ -148,6 +235,8 @@ func _open(key: String, info: Dictionary) -> Control:
 	stage.add_child(c)
 	if debug != null:
 		stage.move_child(debug, -1)
+	if pad:
+		_apply_focus.call_deferred()  # 部品は _ready で作られるので、その後に
 	return c
 
 
@@ -176,7 +265,42 @@ func _begin(mode: int, boss: int) -> void:
 	run["mode"] = mode
 	run["boss"] = boss
 	run["seed"] = DayIndex.day_seed(run["day"]) if mode == Duel.Mode.DAILY else B.FIXED_SEED
-	_start_duel(Duel.new(run["seed"], mode, boss))
+	run["opts"] = play_opts()
+	_start_duel(Duel.new(run["seed"], mode, boss, null, null, run["opts"]))
+
+
+# 設定から、対戦の遊び方の違い(やさしい設定)を作る。drill は型の練習の型の id。
+func play_opts(drill: String = "") -> Dictionary:
+	var easy: bool = save.settings()["easy"] == true
+	var opts := {"easy": easy}
+	if easy:
+		opts.merge({"speed": B.EASY_SPEED, "window": B.EASY_PARRY_WINDOW, "just": B.EASY_JUST_WINDOW})
+	if drill != "":
+		opts["drill"] = drill
+		if drill_slow:
+			opts["speed"] = B.SLOW_SPEED
+	return opts
+
+
+# 型の練習(v0.2.0)。1 つの型を繰り返す。記録に残さない。
+func start_drill(pattern_id: String) -> void:
+	if not data_ok:
+		return
+	run = today()
+	run["mode"] = Duel.Mode.DRILL
+	run["boss"] = 1
+	run["seed"] = B.FIXED_SEED
+	run["opts"] = play_opts(pattern_id)
+	_start_duel(Duel.new(run["seed"], Duel.Mode.DRILL, 1, null, null, run["opts"]))
+
+
+# 型の練習の、型を選ぶ画面。
+func open_practice() -> void:
+	_clear_screens()
+	view.visible = false
+	view.duel = null
+	screen_name = "practice"
+	_screen = _open("practice", {})
 
 
 func _start_duel(d: Duel) -> void:
@@ -184,7 +308,7 @@ func _start_duel(d: Duel) -> void:
 	screen_name = "duel"
 	view.visible = true
 	view.start(d, save.settings())
-	if d.mode != Duel.Mode.PRACTICE and _records():
+	if (d.mode == Duel.Mode.FIXED or d.mode == Duel.Mode.DAILY) and _records():
 		save.reach(d.boss)
 
 
@@ -196,7 +320,7 @@ func _records() -> bool:
 # 負けた後の「この敵からやり直す」(E-13)。
 func retry() -> void:
 	var old: Duel = view.duel
-	_start_duel(Duel.new(old.seed_value, old.mode, old.boss, old.retry_carry()))
+	_start_duel(Duel.new(old.seed_value, old.mode, old.boss, old.retry_carry(), null, run.get("opts", {})))
 
 
 func _on_boss_beaten() -> void:
@@ -268,6 +392,9 @@ func close_settings() -> void:
 	if _settings != null:
 		_settings.queue_free()
 		_settings = null
+	if _pause == null and screen_name != "title":
+		go_title()  # タイトルを作り直す(やさしい設定の印と記録の行を、変えた設定に合わせる)
+		return
 	screen_name = "pause" if _pause != null else "title"
 
 
@@ -293,6 +420,10 @@ func close_calib() -> void:
 func _debug_jump(target: String) -> void:
 	if target == "calib":
 		open_calib()
+	elif target == "practice":
+		open_practice()
+	elif target.begins_with("drill_"):  # 例 go=drill_stone_2_a
+		start_drill(target.trim_prefix("drill_"))
 	elif target.begins_with("duel") and data_ok:
 		var boss := maxi(int(target.trim_prefix("duel")), 1)
 		run = today()

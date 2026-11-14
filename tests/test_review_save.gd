@@ -84,6 +84,7 @@ func test_review_broken_saves_load_sane() -> bool:
 		eq(again.reached_boss(), 3, "着いた敵 7 は 3 に切り詰める")
 	print("RV 壊れた保存 %d 通り。「読めなかった」の旗(E-15)が立った数 = %d  旗の並び = %s" % [CASES.size(), failed_flags.count(1), failed_flags])
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://review_save_ext.json"))
 	return true
 
 
@@ -95,6 +96,7 @@ func test_review_version_and_flag_details() -> bool:
 		var s := SaveStore.new(PATH)
 		print("RV %s: 記録 = %s  読めなかったの旗 = %s" % [c[1], s.fixed_best(), s.load_failed])
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://review_save_ext.json"))
 	return true
 
 
@@ -114,6 +116,7 @@ func test_review_two_tabs_stale_write_drops_record() -> bool:
 	eq(after.reached_boss(), 3, "着いた敵も残る")
 	eq(after.settings()["volume"], 50, "a が変えた設定は入る")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://review_save_ext.json"))
 	return true
 
 
@@ -130,4 +133,5 @@ func test_review_daily_rollover_and_tie() -> bool:
 	var d := s.record_win(Duel.Mode.DAILY, 9, {"hits": 0, "ticks": 5000, "justs": 1, "retries": 0})
 	print("RV きのう始めた回が後から終わる: %s  保存の daily = %s" % [d, s.data["daily"]])
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path("user://review_save_ext.json"))
 	return true
