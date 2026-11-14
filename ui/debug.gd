@@ -15,10 +15,12 @@ var lat_godot: Array = []  # 入力を受けたフレームの頭から、その
 var lat_js: Array = []  # ブラウザのイベントの時刻から、描き終えるまで(ms)。Web だけ
 var input_log: Array = []  # 届いた入力イベントの中身(直近 8 個)
 var frame_ms: Array = []
+const BAND_Y := 140.0  # 計測の帯の上の端
 var frame := 0
 
 var press_diffs: Array = []  # タイミング合わせで押したずれ(ms)。何組測っても足していく(仕様書 §8.2 の「押すずれ」用)
 var auto := false
+var band := true  # 計測の帯を描くか(?band=0 で消す。README の画像を撮る時に使う)
 var _auto_done := {}
 var _auto_wait := 0.0
 var _calib_seen := 0  # 数え終わったタイミング合わせ(同じ組を 2 回足さない)
@@ -53,6 +55,7 @@ func _ready() -> void:
 	if _web:
 		var q: Variant = JavaScriptBridge.eval("location.search", true)
 		auto = q is String and q.contains("auto=1")
+		band = not (q is String and q.contains("band=0"))
 	else:
 		auto = OS.get_cmdline_user_args().has("--auto")
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -241,6 +244,9 @@ func _draw() -> void:
 		lines.append("press diff (calib)  n=%d  median %+.0f ms  sd %.0f ms" % [ps["n"], ps["median"], ps["sd"]])
 	if not input_log.is_empty():
 		lines.append(input_log[input_log.size() - 1].left(96))
-	draw_rect(Rect2(0, 1280 - 22 * lines.size() - 8, 720, 22 * lines.size() + 8), Color(0, 0, 0, 0.6))
+	if not band:
+		return
+	# 上の HUD のすぐ下に置く(下には操作の案内がある)
+	draw_rect(Rect2(0, BAND_Y, 720, 22 * lines.size() + 8), Color(0, 0, 0, 0.6))
 	for i in lines.size():
-		Kit.text(self, Vector2(8, 1280 - 22 * (lines.size() - i) + 12), lines[i], 15, Kit.C_SPARK, 500, HORIZONTAL_ALIGNMENT_LEFT, 710.0)
+		Kit.text(self, Vector2(8, BAND_Y + 22 * i + 20), lines[i], 15, Kit.C_SPARK, 500, HORIZONTAL_ALIGNMENT_LEFT, 710.0)

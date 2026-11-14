@@ -3,7 +3,7 @@
 extends RefCounted
 
 const GAME_NAME := "ParryDuel"
-const VERSION := "v0.1.1"
+const VERSION := "v0.1.2"
 const SHARE_URL := "https://takosasi-dev.github.io/parry-duel/"
 
 # S1 タイトル

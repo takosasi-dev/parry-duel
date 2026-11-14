@@ -13,6 +13,7 @@ export const WEB = process.env.PD_WEB ? path.resolve(process.env.PD_WEB) : path.
 // 書き出しの中に、そのスクリプトが入っているか(例: 'ui/title.gd')。まだ合流していない画面の確認を飛ばすのに使う
 export const inBuild = (resPath) => readFileSync(path.join(WEB, 'index.pck')).includes(resPath);
 export const OUT = path.join(ROOT, 'build', 'web_shots');
+export const SAVE_KEY = 'parry-duel/save'; // save/save_store.gd の WEB_KEY
 // 何人かで同時に動かす時は、環境変数でポートをずらす
 const HTTP_PORT = Number(process.env.PD_HTTP_PORT || 8791);
 const CDP_PORT = Number(process.env.PD_CDP_PORT || 9791);
@@ -154,27 +155,31 @@ export async function open(name, url, { metrics = PHONE, touch = false, gpu = fa
 			await cdp.send('Page.navigate', { url: to });
 			return await waitFor(() => logs.slice(from).some((l) => l.text.startsWith('Godot Engine v')), BOOT_TIMEOUT_MS, 50) !== null;
 		},
-		// ブラウザの中の保存(IndexedDB の /userfs にある user://save.json)を読む。無ければ null
-		saved: async () => JSON.parse(await evaluate(`(async () => {
-			if (!(await indexedDB.databases()).some((d) => d.name === '/userfs')) return 'null';
-			return await new Promise((ok) => {
-				const open = indexedDB.open('/userfs');
-				open.onerror = () => ok('null');
-				open.onsuccess = () => {
-					let out = 'null';
-					try {
-						const walk = open.result.transaction('FILE_DATA').objectStore('FILE_DATA').openCursor();
-						walk.onerror = () => ok('null');
-						walk.onsuccess = () => {
-							const c = walk.result;
-							if (!c) { open.result.close(); ok(out); return; }
-							if (String(c.key).endsWith('/save.json') && c.value.contents) out = new TextDecoder().decode(c.value.contents);
-							c.continue();
-						};
-					} catch { open.result.close(); ok('null'); }
-				};
-			});
-		})()`) || 'null'),
+		// ブラウザの中の保存(localStorage の parry-duel/save。save/save_store.gd)を読む。無ければ null
+		saved: async () => JSON.parse(await evaluate(`localStorage.getItem('${SAVE_KEY}')`) ?? 'null'),
+		// IndexedDB の /userfs(Godot の user:// の実体。同じサイトの Godot のゲーム全部で 1 つ)にある鍵の一覧
+		userfsKeys: async () => JSON.parse(await evaluate(`(async () => {
+			if (!(await indexedDB.databases()).some((d) => d.name === '/userfs')) return '[]';
+			const db = await new Promise((ok, ng) => { const r = indexedDB.open('/userfs'); r.onsuccess = () => ok(r.result); r.onerror = () => ng(r.error); });
+			const keys = await new Promise((ok) => { const r = db.transaction('FILE_DATA').objectStore('FILE_DATA').getAllKeys(); r.onsuccess = () => ok(r.result); r.onerror = () => ok([]); });
+			db.close();
+			return JSON.stringify(keys);
+		})()`)),
+		// /userfs にファイルを入れる(別のゲームや v0.1.1 までが書いた物の代わり)。files は { パス: 中身の文字 }。
+		// Godot が起動して /userfs を作った後に呼ぶ。IDBFS と同じ形で、入れる先のフォルダの項目も足す
+		userfsPut: (files) => evaluate(`(async () => {
+			const db = await new Promise((ok, ng) => { const r = indexedDB.open('/userfs'); r.onsuccess = () => ok(r.result); r.onerror = () => ng(r.error); });
+			const tx = db.transaction('FILE_DATA', 'readwrite');
+			const store = tx.objectStore('FILE_DATA');
+			const now = new Date();
+			for (const [p, text] of Object.entries(${JSON.stringify(files)})) {
+				store.put({ timestamp: now, mode: 0o40777 }, p.slice(0, p.lastIndexOf('/')));
+				store.put({ timestamp: now, mode: 0o100666, contents: new TextEncoder().encode(text) }, p);
+			}
+			await new Promise((ok, ng) => { tx.oncomplete = ok; tx.onerror = () => ng(tx.error); });
+			db.close();
+			return true;
+		})()`),
 		// デバッグ用の窓口の状態(?debug=1 の時だけ出る)
 		state: async () => { try { return JSON.parse(await evaluate('window.pdState') || '{}'); } catch { return {}; } },
 		waitState: async (pred, timeoutMs = 15000, everyMs = 8) => waitFor(async () => { const s = await page.state(); return pred(s) ? s : null; }, timeoutMs, everyMs),

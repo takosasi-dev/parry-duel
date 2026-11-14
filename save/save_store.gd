@@ -1,5 +1,9 @@
-# user://save.json の読み書き(仕様書 §9.11・E-12・E-15・E-16)。記録・着いた敵・設定を持つ。
+# 保存の読み書き(仕様書 §9.11・E-12・E-15・E-16)。記録・着いた敵・設定を持つ。
 # 読めない・壊れている時は既定値で始め、書けなくてもエラーで止めない。外から来た値は型を見てから使う。
+# 置き場: Web はブラウザの localStorage(このゲームだけのキー)、それ以外は user://save.json。
+# Web で user:// を使わないのは、user:// の実体(IndexedDB の /userfs)が同じサイトの Godot のゲーム全部で 1 つだからで、
+# どれかのタブが書くと、そのタブが起動した時の写しで全体を書き戻す(別のタブ・別のゲームの新しい保存が古い物に戻る・消える)。
+# localStorage はタブの間で同じ物を読み書きするので、書く前の読み直し(_merge_from_disk)が別のタブの記録を拾える。
 extends RefCounted
 
 const B := preload("res://core/balance.gd")
@@ -8,11 +12,16 @@ const Duel := preload("res://core/duel.gd")
 
 const PATH := "user://save.json"
 const VERSION := 1
+const WEB_KEY := "parry-duel/save"
+# 使えない時(保存を止めたブラウザなど)は投げずに null / false を返す
+const JS_READ := "(() => { try { return localStorage.getItem('%s'); } catch (e) { return null; } })()" % WEB_KEY
+const JS_WRITE := "(() => { try { localStorage.setItem('%s', %%s); return true; } catch (e) { return false; } })()" % WEB_KEY
 
 var path: String
 var data: Dictionary = {}
 var load_failed := false  # 保存があったのに読めなかった(E-15)
 var write_failed := false  # 直前の書き込みが失敗した(E-16)
+var _web := OS.has_feature("web")
 
 
 func _init(p_path: String = PATH) -> void:
@@ -31,13 +40,38 @@ static func defaults() -> Dictionary:
 func load_data() -> void:
 	data = defaults()
 	load_failed = false
-	if not FileAccess.file_exists(path):
+	var text: Variant = _read_text()
+	if text == null:
 		return
-	var read: Variant = _parse(FileAccess.get_file_as_string(path))
+	var read: Variant = _parse(text)
 	if read == null:
 		load_failed = true
 		return
 	data = read
+
+
+# 保存の文字。無ければ null。
+func _read_text() -> Variant:
+	if _web:
+		var v: Variant = JavaScriptBridge.eval(JS_READ, true)
+		if v is String:
+			return v
+		# まだ localStorage に無い。v0.1.1 までの保存(user://save.json)があれば、それを読む(次に書く時に localStorage へ移る)
+	if not FileAccess.file_exists(path):
+		return null
+	return FileAccess.get_file_as_string(path)
+
+
+func _write_text(text: String) -> bool:
+	if _web:
+		var ok: Variant = JavaScriptBridge.eval(JS_WRITE % JSON.stringify(text), true)
+		return ok is bool and ok
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_string(text)
+	f.close()
+	return true
 
 
 # 保存の文字を読んで、決まった形に直す。JSON として読めない・辞書でない時は null。
@@ -62,9 +96,10 @@ static func _parse(text: String) -> Variant:
 # 書く直前に、今あるファイルを読み直して記録を合わせる。同じブラウザの別のタブが先に書いた記録を、
 # 古い方のタブが上書きして消さないようにする。記録は良い方、着いた敵は先の方、今日の記録は新しい日の方を残す。設定は今の物。
 func _merge_from_disk() -> void:
-	if not FileAccess.file_exists(path):
+	var text: Variant = _read_text()
+	if text == null:
 		return
-	var disk: Variant = _parse(FileAccess.get_file_as_string(path))
+	var disk: Variant = _parse(text)
 	if disk == null:
 		return
 	data["reached_boss"] = maxi(int(data["reached_boss"]), int(disk["reached_boss"]))
@@ -91,13 +126,8 @@ static func _better_of(a: Variant, b: Variant) -> Variant:
 
 func save_data() -> bool:
 	_merge_from_disk()
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	write_failed = f == null
-	if f == null:
-		return false
-	f.store_string(JSON.stringify(data, "", false))
-	f.close()
-	return true
+	write_failed = not _write_text(JSON.stringify(data, "", false))
+	return not write_failed
 
 
 static func _is_num(v: Variant) -> bool:

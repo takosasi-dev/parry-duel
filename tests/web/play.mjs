@@ -158,7 +158,7 @@ export async function playFlow(page, how, url, daily = false) {
 	await sleep(1500); // 入る時の動きが終わるまで
 	await page.shot(`flow_${how}_result`);
 
-	// 記録が、ブラウザの中の保存(IndexedDB)に届いている。時間は、やり直しが無ければ対戦の tick と同じ
+	// 記録が、ブラウザの中の保存(localStorage)に届いている。時間は、やり直しが無ければ対戦の tick と同じ
 	const saved = await waitSaved(page, record);
 	const f = record(saved) ?? {};
 	expect(f.hits === d.hits && (daily || (f.justs === d.justs && f.retries === d.retries)) && (retries > 0 || f.ticks === d.tick) && saved?.reached_boss === 3,
@@ -199,7 +199,7 @@ export async function playFlow(page, how, url, daily = false) {
 	await page.shot(`flow_${how}${daily ? '_daily' : ''}_title_reloaded`);
 }
 
-// 保存が pred を満たすまで待つ(書いてから IndexedDB に届くまで、少し間がある)。満たさなければ最後に読んだ物
+// 保存が pred を満たすまで待つ(押してから保存を書くまで、少し間がある)。満たさなければ最後に読んだ物
 export async function waitSaved(page, pred, timeoutMs = 3000) {
 	const end = Date.now() + timeoutMs;
 	let v = null;

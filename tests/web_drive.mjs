@@ -7,7 +7,8 @@
 //   node tests/web_drive.mjs --play [key|mouse|touch]   敵 3 の練習を、本物の入力で倒し切る(AC-27・AC-28 の対戦の部分)
 //   node tests/web_drive.mjs --lose               負けて「この敵からやり直す」(E-13・NFR-6)
 //   node tests/web_drive.mjs --flow [key|mouse|touch] [--daily]   タイトル → 対戦 → 合間 → 結果 → コピー → タイトル → 読み込み直し(AC-27・AC-28・保存)。--daily は「今日の3連戦」
-//   node tests/web_drive.mjs --settings           設定を変えて、読み込み直した後も残る(IndexedDB への保存)
+//   node tests/web_drive.mjs --settings           設定を変えて、読み込み直した後も残る(localStorage への保存)
+//   node tests/web_drive.mjs --storage            別のタブ・別のゲームの保存を消さない、v0.1.1 までの保存を引き継ぐ
 //   node tests/web_drive.mjs --latency [key|mouse|touch] [--gpu]   入力から描画までの時間を、押し 100 回ぶん測る(NFR-2・仕様書 §8.2)
 //   node tests/web_drive.mjs --perf               自動の相手に 60 秒戦わせた 1 フレームの時間(NFR-1。窓なしなので参考値)
 //   node tests/web_drive.mjs --quiet              読み込みの後、3 分間の通信が 0 件(NFR-8・AC-31)
@@ -20,7 +21,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { BROWSERS, DESKTOP, MOBILE_1X, PHONE, WEB, expect, failureCount, inBuild, open, serve, sleep } from './web/lib.mjs';
+import { BROWSERS, DESKTOP, MOBILE_1X, PHONE, SAVE_KEY, WEB, expect, failureCount, inBuild, open, serve, sleep } from './web/lib.mjs';
 import { PARRY_TYPES, count, hasMenus, newTally, playFlow, playLose, playPractice, presser, take, waitSaved } from './web/play.mjs';
 import { gif, shots } from './web/shots.mjs';
 
@@ -323,7 +324,7 @@ async function flow(base, hows) {
 	if (has('--all')) await run(browsers()[0], 'mouse', true); // 「今日の3連戦」の入口も 1 回
 }
 
-// 設定を変えて、ブラウザの中の保存(IndexedDB)に届くこと、読み込み直しても残ることを見る。
+// 設定を変えて、ブラウザの中の保存(localStorage)に届くこと、読み込み直しても残ることを見る。
 // 読み込み直すまでの待ちは 5 通り(3 秒・1 秒・0.3 秒・0.1 秒・すぐ)。1 秒未満は間に合わないことがあり得るので、結果を出すだけ
 async function settings(base) {
 	if (!inBuild('ui/settings.gd')) { console.log('--  --settings: 設定の画面がまだ無いので飛ばす'); return; }
@@ -364,6 +365,54 @@ async function settings(base) {
 			// 設定は Esc でタイトルに戻る
 			await page.key('Escape');
 			expect(await page.waitState((s) => s.screen === 'title', 3000) !== null, `${name}: 設定は Esc でタイトルに戻る`);
+			noErrors(page);
+		});
+	}
+}
+
+// 保存の置き場(save/save_store.gd の頭)。同じサイトの Godot のゲームは IndexedDB の /userfs を 1 つ共有するので、
+// ParryDuel は localStorage に書く。(1) v0.1.1 までの /userfs の保存を引き継ぐ (2) 起動した後に別のゲームが書いた /userfs を消さない
+// (3) 別のタブが書いた良い記録を、こちらの書き込みで消さない
+async function storage(base) {
+	const LEGACY = '/userfs/godot/app_userdata/ParryDuel/save.json';
+	const OTHER = '/userfs/godot/app_userdata/OtherGame/save.json';
+	const old = { version: 1, fixed: { hits: 2, ticks: 20000, justs: 5, retries: 0 }, daily: null, reached_boss: 3 };
+	const better = { hits: 0, ticks: 15000, justs: 9, retries: 0 };
+	for (const name of browsers()) {
+		await withPage(name, `${base}?debug=1`, {}, async (page) => {
+			const title = () => page.waitState((s) => s.screen === 'title' && s.buttons?.btn_fixed, 30000);
+			if (!expect(await title() !== null, `${name}: タイトルが出る`)) return;
+			await page.userfsPut({ [LEGACY]: JSON.stringify(old) });
+			await page.goto(`${base}?debug=1`);
+			const t = await title();
+			expect(t !== null && Boolean(t.buttons.btn_practice_3) && await page.saved() === null,
+				`${name}: (1) v0.1.1 までの保存(/userfs)を読む。練習の敵 3 が押せる(押せるボタン: ${Object.keys(t?.buttons ?? {}).join(' ')})`);
+
+			await page.userfsPut({ [OTHER]: '{"other":true}' }); // このタブが起動した後に、別のゲームが書いた
+			await page.clickButton('btn_settings');
+			if (!expect(await page.waitState((s) => s.screen === 'settings', 5000) !== null, `${name}: 設定が開く`)) return;
+			await page.clickButton('btn_vol_25');
+			let saved = await waitSaved(page, (v) => v?.settings?.volume === 25);
+			expect(JSON.stringify(saved?.fixed) === JSON.stringify(old.fixed) && saved?.reached_boss === 3,
+				`${name}: (1) 書くと、引き継いだ記録ごと localStorage に移る(保存: ${JSON.stringify(saved)})`);
+			await sleep(1500); // Godot が /userfs を書き戻すなら、この間に起きる
+			const keys = await page.userfsKeys();
+			expect(keys.includes(OTHER), `${name}: (2) 起動した後に別のゲームが書いた /userfs の保存が残る(/userfs の鍵: ${keys.join(' ')})`);
+
+			await page.evaluate(`localStorage.setItem('${SAVE_KEY}', JSON.stringify({ ...JSON.parse(localStorage.getItem('${SAVE_KEY}')), fixed: ${JSON.stringify(better)} }))`);
+			await page.clickButton('btn_shake_off');
+			saved = await waitSaved(page, (v) => v?.settings?.shake === false);
+			expect(JSON.stringify(saved?.fixed) === JSON.stringify(better) && saved?.settings?.volume === 25,
+				`${name}: (3) 別のタブが書いた良い記録が、こちらの書き込みの後も残る(保存: ${JSON.stringify(saved)})`);
+
+			// 対戦の描画で Godot が user:// に何か(描画のキャッシュなど)を書いても、/userfs を書き戻さない
+			const OTHER2 = '/userfs/godot/app_userdata/OtherGame/later.json';
+			await page.userfsPut({ [OTHER2]: '{}' });
+			await page.key('Escape');
+			await page.clickButton('btn_practice_1');
+			const d = await page.waitState((s) => s.screen === 'duel' && s.duel?.tick > 600, 30000);
+			const keys2 = await page.userfsKeys();
+			expect(d !== null && keys2.includes(OTHER2), `${name}: (2) 対戦を 5 秒動かしても、別のゲームが書いた /userfs の保存が残る(/userfs の鍵 ${keys2.length} 個)`);
 			noErrors(page);
 		});
 	}
@@ -464,6 +513,7 @@ const MODES = {
 	'--lose': (b) => lose(b),
 	'--flow': (b) => flow(b, hows('--flow')),
 	'--settings': (b) => settings(b),
+	'--storage': (b) => storage(b),
 	'--latency': (b) => latency(b, valueOf('--latency') ?? 'key'),
 	'--perf': (b) => perf(b),
 	'--quiet': (b) => quiet(b),

@@ -8,9 +8,9 @@ import { fight } from './play.mjs';
 
 const DOCS = path.join(ROOT, 'docs');
 const FFMPEG = process.env.FFMPEG || 'ffmpeg'; // PATH に無ければ、環境変数 FFMPEG に実行ファイルの場所を入れる
-// ?debug=1 の間は、画面の下にデバッグ用の帯(4 行で y 1184 から下)が出る。README 用は、その上だけを切り出す。
+// README 用の画像は ?band=0 で撮る(計測の帯を描かない。状態の窓口 window.pdState はそのまま)。
 // 下の端まで物がある画面(タイトル・設定・タイミング合わせ)は、?debug=1 なしで開き直して撮る
-const KEEP = 1184 / 1280;
+const KEEP = 1;
 const GIF_MAX_BYTES = 4e6;
 const flying = (d, kind) => d.attacks.some((a) => a.kind === kind && a.judged - d.tick >= 12 && a.judged - d.tick <= 40);
 
@@ -133,12 +133,12 @@ async function fullRun(page, base, taken, snap) {
 export async function shots(base, withPage, name) {
 	mkdirSync(DOCS, { recursive: true });
 	const menus = inBuild('ui/title.gd');
-	await withPage(name, `${base}?debug=1${menus ? '' : '&go=duel3'}`, { metrics: PHONE }, async (page) => {
+	await withPage(name, `${base}?debug=1&band=0${menus ? '' : '&go=duel3'}`, { metrics: PHONE }, async (page) => {
 		const taken = {};
 		const snap = async (label) => { taken[label] = await page.shot(`shot_${label}`); };
 		if (menus) await fullRun(page, base, taken, snap); else await duelOnly(page, taken, snap);
 		for (const label of Object.keys(scenes())) if (taken[label]) await remake(page, taken[label], taken[label].replace(/\.png$/, '_gray.png'), { gray: true });
-		// README 用(デバッグ用の帯を切る)
+		// README 用(帯は ?band=0 で出ていない)
 		const main = taken.both ?? taken.red;
 		if (main) {
 			await remake(page, main, path.join(DOCS, 'duel.png'), { keep: KEEP });
