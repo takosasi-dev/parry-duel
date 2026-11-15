@@ -123,3 +123,9 @@ docs/     README の画像
 ## ライセンス
 
 コードは [MIT](LICENSE)。効果音は `tools/gen_sfx.py`、BGM は `tools/gen_bgm.py` で作った自作です。同梱の字体(Noto Sans JP の部分集合)は SIL Open Font License 1.1 です。Godot Engine の表示を含め、詳しくは [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+<!-- takosasi-dev line: the sign and the links follow https://github.com/takosasi-dev/takosasi-dev -->
+<p align="center">
+<a href="https://github.com/takosasi-dev"><img src="https://raw.githubusercontent.com/takosasi-dev/takosasi-dev/main/assets/stations/parry-duel.svg" width="640" alt="たこさし線の駅名標(作者のほかの制作物へ)"></a><br>
+<a href="https://takosasi-dev.github.io/takosasi-dev/line/?from=parry-duel&amp;go=prev">◀ 前の駅</a> ・ <a href="https://github.com/takosasi-dev">路線図</a> ・ <a href="https://takosasi-dev.github.io/takosasi-dev/line/?from=parry-duel&amp;go=next">次の駅 ▶</a>
+</p>
