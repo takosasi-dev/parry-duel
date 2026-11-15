@@ -3,7 +3,7 @@
 extends RefCounted
 
 const GAME_NAME := "ParryDuel"
-const VERSION := "v0.2.0"
+const VERSION := "v0.3.0"
 const SHARE_URL := "https://takosasi-dev.github.io/parry-duel/"
 
 # S1 タイトル
@@ -57,6 +57,8 @@ const SAVE_FAILED := "このブラウザでは記録を残せない"
 # S5 設定
 const SETTINGS := "設定"
 const VOLUME := "音量"
+const VOLUME_SFX := "効果音"
+const VOLUME_BGM := "BGM"
 const SHAKE := "画面の揺れ"
 const REDUCE_FLASH := "点滅を弱める"
 const OFFSET := "判定のずれ"
@@ -99,6 +101,34 @@ const SPEED := "速さ"
 const SPEED_NORMAL := "ふつう"
 const SPEED_SLOW := "ゆっくり"
 const HOW_PAD := "パッド: A・RB で弾く / B・LB で避ける / Start で一時停止"
+
+# v0.3.0: 終わらない連戦
+const BTN_ENDLESS := "終わらない連戦"
+const ENDLESS := "終わらない連戦"
+const ENDLESS_LOCKED := "敵 3 に着くと遊べる"
+const SHARE_ENDLESS := "終わらない連戦"
+
+# v0.3.0: 実績。[id, 名前, 取り方]。並びは一覧の順(core/achievements.gd の IDS と同じ物を全部)
+const ACHIEVEMENTS := [
+	["first_parry", "初めての弾き", "白を 1 回弾く"],
+	["first_just", "ぴったり", "ぴったりで弾く"],
+	["first_counter", "反撃", "よろけた敵に反撃する"],
+	["just_streak", "ぴったり 10 連続", "ぴったりを 10 回続ける"],
+	["unhurt_boss", "無傷の 1 体", "1 体を、受けた数 0 で倒す"],
+	["win_fixed", "いつもの3連戦", "いつもの3連戦を勝ち抜く"],
+	["win_daily", "今日の3連戦", "今日の3連戦を勝ち抜く"],
+	["unhurt_run", "無傷の 3 連戦", "3 連戦を、受けた数 0 で勝ち抜く"],
+	["no_retry", "やり直し無し", "3 連戦を、やり直し無しで勝ち抜く"],
+	["dodge_red", "赤を 20 回", "赤を合わせて 20 回避ける"],
+	["endless_lap2", "2 周", "終わらない連戦で 6 体を倒す"],
+	["endless_lap4", "4 周", "終わらない連戦で 12 体を倒す"],
+	["calib", "タイミング合わせ", "タイミング合わせの値を使う"],
+	["drill", "型の練習 50 回", "型の練習で合わせて 50 回弾く"],
+]
+const BTN_ACH := "実績"
+const ACH_TITLE := "実績"
+const ACH_GOT := "実績を取った"
+const ACH_LOCKED := "まだ"
 
 
 static func boss_of(n: int, total: int) -> String:
@@ -206,6 +236,53 @@ static func apply_offset(ms: int) -> String:
 # 型の練習の型の名前。「敵 2・段階 3・B」。
 static func drill_name(boss: int, phase: int, letter: String) -> String:
 	return "敵 %d・%s %d・%s" % [boss, PHASE, phase, letter]
+
+
+# 実績の名前・取り方(知らない id は "")。
+static func ach_name(id: String) -> String:
+	for a: Array in ACHIEVEMENTS:
+		if a[0] == id:
+			return a[1]
+	return ""
+
+
+static func ach_desc(id: String) -> String:
+	for a: Array in ACHIEVEMENTS:
+		if a[0] == id:
+			return a[2]
+	return ""
+
+
+static func ach_count(n: int, total: int) -> String:
+	return "%d / %d" % [n, total]
+
+
+static func endless_nth(n: int) -> String:
+	return "%d 体目" % n
+
+
+static func kills(n: int) -> String:
+	return "%d 体" % n
+
+
+static func endless_best(n: int) -> String:
+	return "最高 %d 体" % n
+
+
+static func endless_beaten(n: int) -> String:
+	return "%d 体を倒した" % n
+
+
+static func endless_speed(pct: int) -> String:
+	return "次の敵の速さ %d%%" % pct
+
+
+static func endless_more(n: int) -> String:
+	return "最高まで あと %d 体" % n
+
+
+static func endless_beyond(n: int) -> String:
+	return "最高より +%d 体(%s)" % [n, NEW_RECORD]
 
 
 static func phase_n(n: int) -> String:

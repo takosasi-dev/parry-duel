@@ -43,6 +43,16 @@ const SLOW_SPEED := 75  # 型の練習の「ゆっくり」
 const NEAR_MISS_TICKS := 36  # 空振りの時、当たる tick がこれより近い白があれば「早すぎ・遅すぎ」を出す
 const TENDENCY_MIN := 8  # 押す癖を出すのに要る数
 const TENDENCY_MIN_TICKS := 2  # 平均のずれがこれ以上(約 17 ms)なら、判定のずれの直しを勧める
+# v0.3.0: 終わらない連戦。3 体を繰り返し、1 周ごとに攻撃を速くする。上限は人が読める速さ(一番短い予兆が 125% で 29 tick)。
+# 完璧に押す相手は 160% まで無傷で倒せる(2026-11-14 に測った)ので、上限を決めるのは人の側
+const ENDLESS_STEP := 5  # 1 周(3 体)ごとに足す速さ(%)
+const ENDLESS_MAX := 125  # 速さの上限(%)
+const ENDLESS_HEAL := 1  # 体力は敵ごとに戻さず持ち越し、1 体倒すごとにこれだけ戻す
+const ENDLESS_SEED_MUL := 0x27D4EB2D  # 周ごとに型の順を変える種
+# v0.3.0: 実績
+const ACH_JUST_STREAK := 10  # ぴったりを続ける数
+const ACH_RED_DODGES := 20  # 赤を避けた数(合わせて)
+const ACH_DRILL_PARRIES := 50  # 型の練習で弾いた数(合わせて)
 
 # タイミング合わせ(§9.14)
 const CALIB_COUNT := 8
@@ -92,3 +102,4 @@ const WINDUP_PULL := 20.0
 # 設定の既定値と範囲(§9.11)
 const VOLUMES := [0, 25, 50, 75, 100]
 const DEFAULT_VOLUME := 75
+const DEFAULT_BGM_VOLUME := 75  # v0.3.0

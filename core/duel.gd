@@ -8,7 +8,7 @@ const Judge := preload("res://core/judge.gd")
 const PatternStore := preload("res://core/pattern_store.gd")
 const Sequencer := preload("res://core/sequencer.gd")
 
-enum Mode { FIXED, DAILY, PRACTICE, DRILL }  # DRILL = 型の練習(1 つの型を繰り返す。v0.2.0)
+enum Mode { FIXED, DAILY, PRACTICE, DRILL, ENDLESS }  # DRILL = 型の練習(v0.2.0)、ENDLESS = 終わらない連戦(v0.3.0)
 enum State { INTRO, PATTERN, GAP, STAGGER, RECOVER, WAIT_NEXT, DONE }
 
 var seed_value: int
@@ -26,6 +26,8 @@ var push_ticks: int = B.PUSH_TICKS  # 押し込みの長さ。いつも弾くの
 var easy := false  # やさしい設定で始めた回(記録は別枠)
 var drill_id := ""  # 型の練習の型の id。それ以外は ""
 var diffs: Array = []  # 押したずれ(tick、負 = 早い)。弾いた時と、近くの白を空振りした時
+var kills := 0  # 終わらない連戦で倒した数
+var base_speed: int = B.SPEED_NORMAL  # 始めた時の速さ。終わらない連戦は、これに周ごとの速さを掛ける
 
 var player_hp: int = B.PLAYER_HP
 var lock := 0
@@ -74,6 +76,9 @@ func _init(p_seed: int, p_mode: int, start_boss: int, carry: Variant = null, bos
 	just_window = clampi(int(opts.get("just", B.JUST_WINDOW)), 0, parry_window)
 	push_ticks = parry_window + 1
 	easy = opts.get("easy", false) == true
+	base_speed = speed
+	if mode == Mode.ENDLESS:
+		teach_done = [true, true, true]  # 教える型は出さない
 	if carry is Dictionary:
 		hits = int(carry.get("hits", 0))
 		base_ticks = int(carry.get("ticks", 0))
@@ -140,7 +145,7 @@ func time_ticks() -> int:
 
 func result() -> Dictionary:
 	return {"won": won, "mode": mode, "boss": boss, "hits": hits, "ticks": time_ticks(),
-		"justs": justs, "parries": parries, "retries": retries, "easy": easy, "diffs": diffs.duplicate(), "offset": offset}
+		"justs": justs, "parries": parries, "retries": retries, "easy": easy, "diffs": diffs.duplicate(), "offset": offset, "kills": kills}
 
 
 # 負けて「この敵からやり直す」の時に、次の Duel へ渡す値(E-13)。
@@ -156,7 +161,7 @@ func snapshot() -> Dictionary:
 		"state": state, "state_from": state_from, "state_until": state_until,
 		"player_hp": player_hp, "lock": lock, "dodge_ticks": dodge_ticks, "hurt_ticks": hurt_ticks,
 		"freeze_ticks": freeze_ticks, "hits": hits, "justs": justs, "parries": parries, "combo": combo,
-		"retries": retries, "time_ticks": time_ticks(), "teaching": not teach_done[boss - 1],
+		"retries": retries, "time_ticks": time_ticks(), "teaching": not teach_done[boss - 1], "kills": kills,
 		"pattern_id": _pattern.get("id", ""), "attacks": _attacks, "over": over, "won": won,
 		"speed": speed, "easy": easy, "drill_id": drill_id,
 	}
@@ -166,11 +171,16 @@ func snapshot() -> Dictionary:
 func next_boss() -> void:
 	if state != State.WAIT_NEXT:
 		return
-	boss += 1
+	if mode == Mode.ENDLESS:  # 3 体を繰り返す。周ごとに速く、体力は持ち越して少し戻す
+		boss = kills % B.BOSS_COUNT + 1
+		speed = endless_speed(base_speed, kills)
+		player_hp = mini(player_hp + B.ENDLESS_HEAL, B.PLAYER_HP)
+	else:
+		boss += 1
+		player_hp = B.PLAYER_HP
 	phase = 1
 	boss_hp = B.BOSS_HP
 	stagger = 0
-	player_hp = B.PLAYER_HP
 	lock = 0
 	dodge_ticks = 0
 	hurt_ticks = 0
@@ -222,7 +232,21 @@ func _enter(new_state: int, ticks: int) -> void:
 func _new_sequencer() -> Sequencer:
 	if not _drill.is_empty():  # 型の練習: その型だけ(2 回目からは腕の入れ替えがある)
 		return Sequencer.new(seed_value, boss, phase, [_drill], true)
-	return Sequencer.new(seed_value, boss, phase, _bosses[boss - 1]["phases"][phase - 1]["patterns"], teach_done[boss - 1])
+	var s := seed_value
+	var mixed := false
+	if mode == Mode.ENDLESS:  # 2 周目からは、周ごとの種で最初から混ぜて出す(1 周目は 3 連戦と同じ順)
+		@warning_ignore("integer_division")
+		var lap := kills / B.BOSS_COUNT
+		s = (seed_value + lap * B.ENDLESS_SEED_MUL) & 0xFFFFFFFF
+		mixed = lap > 0
+	return Sequencer.new(s, boss, phase, _bosses[boss - 1]["phases"][phase - 1]["patterns"], teach_done[boss - 1], mixed)
+
+
+# 終わらない連戦で、kills 体を倒した後の速さ(%)。1 周(3 体)ごとに ENDLESS_STEP、上限 ENDLESS_MAX。base は始めた時の速さ。
+@warning_ignore("integer_division")
+static func endless_speed(base: int, kills_so_far: int) -> int:
+	var lap := kills_so_far / B.BOSS_COUNT
+	return base * mini(B.SPEED_NORMAL + B.ENDLESS_STEP * lap, B.ENDLESS_MAX) / B.SPEED_NORMAL
 
 
 # 3. 入力を使う。弾く → 避ける の順。硬直の間は捨てる(E-2)。弾くを使った tick の避けるは捨てる(E-1)。
@@ -300,8 +324,13 @@ func _counter() -> void:
 		_enter(State.RECOVER, B.RECOVER_TICKS)
 		_emit("boss_phase", {"phase": phase})
 		return
-	_emit("boss_down", {"boss": boss})
-	if boss >= B.BOSS_COUNT or mode == Mode.PRACTICE:
+	if mode == Mode.ENDLESS:
+		kills += 1
+	_emit("boss_down", {"boss": boss, "kills": kills})
+	if mode == Mode.ENDLESS:
+		state = State.WAIT_NEXT
+		state_from = tick
+	elif boss >= B.BOSS_COUNT or mode == Mode.PRACTICE:
 		over = true
 		won = true
 		state = State.DONE

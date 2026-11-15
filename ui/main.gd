@@ -9,13 +9,17 @@ const PatternStore := preload("res://core/pattern_store.gd")
 const ShareText := preload("res://core/share_text.gd")
 const SaveStore := preload("res://save/save_store.gd")
 const Kit := preload("res://ui/kit.gd")
+const S := preload("res://core/strings.gd")
 const DuelView := preload("res://ui/duel_view.gd")
 const CalibView := preload("res://ui/calib_view.gd")
 const Debug := preload("res://ui/debug.gd")
+const Achievements := preload("res://core/achievements.gd")
+const Toast := preload("res://ui/toast.gd")
 
 const SCREENS := {
 	"title": "res://ui/title.gd", "interval": "res://ui/interval.gd", "result": "res://ui/result.gd",
 	"settings": "res://ui/settings.gd", "pause": "res://ui/pause.gd", "practice": "res://ui/practice.gd",
+	"achievements": "res://ui/achievements.gd",
 }
 
 var save: SaveStore
@@ -28,6 +32,9 @@ var screen_name := ""
 var run := {}  # 今の回: { mode, boss(練習で選んだ敵), y, m, d, day, date, seed, opts }
 var drill_slow := false  # 型の練習の「ゆっくり」(この回の間だけ覚える)
 var pad := false  # ゲームパッドで操作している間は真。ボタンを選べる(focus)ようにする
+var ach := Achievements.new()  # 実績の判定(v0.3.0)
+var toast: Toast  # 実績を取った時の知らせ
+var _counts_dirty := false  # 実績の数(counts)が変わって、まだ書いていない
 
 var _back: Node2D
 var _screen: Control = null  # タイトル・合間・結果のどれか
@@ -54,7 +61,10 @@ func _ready() -> void:
 	view.retry_requested.connect(retry)
 	view.title_requested.connect(go_title)
 	view.pause_requested.connect(pause)
+	view.event_sink = _on_duel_event
 	stage.add_child(view)
+	toast = Toast.new()
+	stage.add_child(toast)
 	get_viewport().size_changed.connect(_layout)
 	_layout()
 	settings_changed()
@@ -92,6 +102,7 @@ func _input(event: InputEvent) -> void:
 	# 音は、最初の操作の後から鳴らす(FR-29)
 	if (event is InputEventKey or event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventJoypadButton) and event.pressed:
 		Sfx.unlock()
+		Bgm.unlock()
 	if event is InputEventJoypadButton and event.pressed:
 		_pad_input(event)
 	elif (event is InputEventMouseButton or event is InputEventScreenTouch or event is InputEventKey) and event.pressed and pad:
@@ -211,6 +222,7 @@ func today() -> Dictionary:
 func settings_changed() -> void:
 	var st := save.settings()
 	Sfx.set_volume(st["volume"])
+	Bgm.set_volume(st["bgm_volume"])
 	if view != null:
 		view.apply_settings(st)
 
@@ -233,6 +245,7 @@ func _open(key: String, info: Dictionary) -> Control:
 	c.size = stage.size
 	c.setup(self, info)
 	stage.add_child(c)
+	stage.move_child(toast, -1)
 	if debug != null:
 		stage.move_child(debug, -1)
 	if pad:
@@ -241,11 +254,13 @@ func _open(key: String, info: Dictionary) -> Control:
 
 
 func go_title() -> void:
+	_flush_counts()
 	_clear_screens()
 	view.visible = false
 	view.duel = null
 	screen_name = "title"
 	_screen = _open("title", {"load_failed": save.load_failed, "data_ok": data_ok})
+	Bgm.play("title")
 
 
 # いつもの3連戦(Duel.Mode.FIXED)か、今日の3連戦(Duel.Mode.DAILY)を敵 1 から始める。
@@ -282,6 +297,18 @@ func play_opts(drill: String = "") -> Dictionary:
 	return opts
 
 
+# 終わらない連戦(v0.3.0)。敵 1 から 3 体を繰り返す。敵 3 に着いてから遊べる。やり直しは無く、負けたら結果へ。
+func start_endless() -> void:
+	if not data_ok or save.reached_boss() < B.BOSS_COUNT:
+		return
+	run = today()
+	run["mode"] = Duel.Mode.ENDLESS
+	run["boss"] = 1
+	run["seed"] = B.FIXED_SEED  # 誰でも同じ順(記録を比べられる)
+	run["opts"] = play_opts()
+	_start_duel(Duel.new(run["seed"], Duel.Mode.ENDLESS, 1, null, null, run["opts"]))
+
+
 # 型の練習(v0.2.0)。1 つの型を繰り返す。記録に残さない。
 func start_drill(pattern_id: String) -> void:
 	if not data_ok:
@@ -292,6 +319,42 @@ func start_drill(pattern_id: String) -> void:
 	run["seed"] = B.FIXED_SEED
 	run["opts"] = play_opts(pattern_id)
 	_start_duel(Duel.new(run["seed"], Duel.Mode.DRILL, 1, null, null, run["opts"]))
+
+
+# 実績の一覧(v0.3.0)。
+func open_achievements() -> void:
+	_clear_screens()
+	view.visible = false
+	view.duel = null
+	screen_name = "achievements"
+	_screen = _open("achievements", {})
+
+
+# 対戦の出来事 1 つ(duel_view が渡す)。実績を見る。自動の相手の回は数えない。
+func _on_duel_event(e: Dictionary) -> void:
+	if not _records() or view.duel == null:
+		return
+	var got := ach.on_event(e, view.duel, save.counts())
+	if e["type"] == "dodge_avoid" or (e["type"] == "parry" and view.duel.mode == Duel.Mode.DRILL):
+		_counts_dirty = true
+	if not got.is_empty():
+		achieve(got)
+
+
+# 実績を取る。新しく取った物だけ知らせる(保存は save.unlock が書く。数もそこで一緒に書かれる)。
+func achieve(ids: Array) -> void:
+	var fresh: Array = save.unlock(ids, today()["date"])
+	if not fresh.is_empty():
+		_counts_dirty = false
+	for id: String in fresh:
+		toast.push(S.ach_name(id))
+
+
+# 数だけが変わった時は、区切り(敵を倒した・終わった・タイトルへ)で書く。
+func _flush_counts() -> void:
+	if _counts_dirty:
+		_counts_dirty = false
+		save.save_data()
 
 
 # 型の練習の、型を選ぶ画面。
@@ -308,6 +371,8 @@ func _start_duel(d: Duel) -> void:
 	screen_name = "duel"
 	view.visible = true
 	view.start(d, save.settings())
+	Bgm.play("duel")
+	ach.begin(d)
 	if (d.mode == Duel.Mode.FIXED or d.mode == Duel.Mode.DAILY) and _records():
 		save.reach(d.boss)
 
@@ -325,9 +390,13 @@ func retry() -> void:
 
 func _on_boss_beaten() -> void:
 	var r: Dictionary = view.duel.result()
+	_flush_counts()
 	view.visible = false
 	screen_name = "interval"
-	_screen = _open("interval", {"boss": r["boss"], "hits": r["hits"], "ticks": r["ticks"], "justs": r["justs"]})
+	var info := {"boss": r["boss"], "hits": r["hits"], "ticks": r["ticks"], "justs": r["justs"], "mode": r["mode"], "kills": r["kills"]}
+	if r["mode"] == Duel.Mode.ENDLESS:
+		info["next_speed"] = roundi(Duel.endless_speed(view.duel.base_speed, r["kills"]) * 100.0 / B.SPEED_NORMAL)
+	_screen = _open("interval", info)
 
 
 # 合間の「次の敵へ」。
@@ -336,7 +405,8 @@ func next_boss() -> void:
 	screen_name = "duel"
 	view.visible = true
 	view.next_boss()
-	if _records():
+	ach.boss_start(view.duel)
+	if _records() and (view.duel.mode == Duel.Mode.FIXED or view.duel.mode == Duel.Mode.DAILY):
 		save.reach(view.duel.boss)
 
 
@@ -345,18 +415,28 @@ func _on_finished() -> void:
 	var practice: bool = r["mode"] == Duel.Mode.PRACTICE
 	var info := {"result": r, "mode": r["mode"], "practice": practice, "date": run["date"],
 		"record": {"prev_best": null, "new_best": false, "first_today": false, "saved": true}, "share_text": ""}
-	if not practice and r["won"] and _records():
+	if _records():
+		achieve(Achievements.on_result(r))
+	_flush_counts()
+	if r["mode"] == Duel.Mode.ENDLESS:
+		if _records():
+			info["record"] = save.record_endless(r)
+		info["share_text"] = ShareText.build(run["date"], r["mode"], false, r)
+	elif not practice and r["won"] and _records():
 		info["record"] = save.record_win(r["mode"], run["day"], r)
 		info["share_text"] = ShareText.build(run["date"], r["mode"], info["record"]["first_today"], r)
 	view.visible = false
 	screen_name = "result"
 	_screen = _open("result", info)
+	Bgm.play("title")
 
 
 # 結果の「もう1回」。同じ入口をもう一度。
 func again() -> void:
 	if run["mode"] == Duel.Mode.PRACTICE:
 		start_practice(run["boss"])
+	elif run["mode"] == Duel.Mode.ENDLESS:
+		start_endless()
 	else:
 		start_run(run["mode"])
 
@@ -422,6 +502,12 @@ func _debug_jump(target: String) -> void:
 		open_calib()
 	elif target == "practice":
 		open_practice()
+	elif target == "endless" and data_ok:  # 敵 3 に着いていなくても入れる(確かめ用)
+		run = today()
+		run.merge({"mode": Duel.Mode.ENDLESS, "boss": 1, "seed": B.FIXED_SEED, "opts": play_opts()})
+		_start_duel(Duel.new(B.FIXED_SEED, Duel.Mode.ENDLESS, 1, null, null, run["opts"]))
+	elif target == "achievements":
+		open_achievements()
 	elif target.begins_with("drill_"):  # 例 go=drill_stone_2_a
 		start_drill(target.trim_prefix("drill_"))
 	elif target.begins_with("duel") and data_ok:

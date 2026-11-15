@@ -47,6 +47,7 @@ var _freeze_t := 0.0  # 止め(12 tick)の残りの秒。敵を倒した時は s
 var _lose_box: Control
 var _pause_btn: Button
 var _show_diff := true  # 押したずれを出す(設定)
+var event_sink: Callable  # 出来事を 1 つずつ渡す先(main の実績の判定。v0.3.0)
 var _trig := {}  # パッドの引き金(軸)を押し込んでいるか。押し込んだ時だけ 1 回に数える
 
 
@@ -269,7 +270,7 @@ func _watch_end(delta: float) -> void:
 		finished.emit()
 	elif duel.over and not duel.won and _end_t >= 0.9:
 		_end_sent = true
-		if duel.mode == Duel.Mode.PRACTICE:
+		if duel.mode == Duel.Mode.PRACTICE or duel.mode == Duel.Mode.ENDLESS:  # やり直しが無い
 			finished.emit()
 		else:
 			_lose_box.visible = true
@@ -279,6 +280,8 @@ func _watch_end(delta: float) -> void:
 func _on_event(e: Dictionary) -> void:
 	_seq += 1
 	event_log.append([_seq, e["type"], e["tick"]])
+	if event_sink.is_valid():
+		event_sink.call(e)
 	if event_log.size() > LOG_MAX:
 		event_log.pop_front()
 	match e["type"]:
@@ -474,6 +477,8 @@ func _draw() -> void:
 		var a2 := clampf(minf(k * 5.0, (1.0 - k) * 3.0), 0.0, 1.0)
 		if duel.mode == Duel.Mode.DRILL:
 			Kit.text(self, Vector2(360, 760), _drill_name(), 52, Color(Kit.C_TEXT, a2), 900)
+		elif duel.mode == Duel.Mode.ENDLESS:
+			Kit.text(self, Vector2(360, 760), S.endless_nth(duel.kills + 1), 72, Color(Kit.C_TEXT, a2), 900)
 		else:
 			Kit.text(self, Vector2(360, 760), S.boss_of(boss, B.BOSS_COUNT), 72, Color(Kit.C_TEXT, a2), 900)
 
@@ -620,9 +625,10 @@ func _draw_hud(s: Dictionary) -> void:
 		Kit.text(self, Vector2(134, 122), sub, 22, Kit.C_DIM, 500, HORIZONTAL_ALIGNMENT_LEFT, 560.0)
 		_draw_guide(s)
 		return
-	Kit.text(self, Vector2(134, 66), S.boss_of(s["boss"], B.BOSS_COUNT), 28, Kit.C_TEXT, 700, HORIZONTAL_ALIGNMENT_LEFT, 300.0)
+	var head := S.endless_nth(int(s["kills"]) + 1) if int(s["mode"]) == Duel.Mode.ENDLESS else S.boss_of(s["boss"], B.BOSS_COUNT)
+	Kit.text(self, Vector2(134, 66), head, 28, Kit.C_TEXT, 700, HORIZONTAL_ALIGNMENT_LEFT, 300.0)
 	if s["easy"]:
-		Kit.text(self, Vector2(246, 66), S.EASY, 22, Kit.C_SPARK, 700, HORIZONTAL_ALIGNMENT_LEFT, 200.0)
+		Kit.text(self, Vector2(134 + Kit.font(700).get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x + 14, 66), S.EASY, 22, Kit.C_SPARK, 700, HORIZONTAL_ALIGNMENT_LEFT, 200.0)
 	# 段階(残っている体力の数だけ塗る)
 	Kit.text(self, Vector2(134, 122), S.PHASE, 22, Kit.C_DIM, 500, HORIZONTAL_ALIGNMENT_LEFT, 100.0)
 	var col := Kit.boss_color(s["boss"])

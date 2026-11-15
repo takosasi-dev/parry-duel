@@ -12,6 +12,15 @@ static func better(a: Dictionary, b: Dictionary) -> bool:
 	return ah < bh or (ah == bh and int(a["ticks"]) < int(b["ticks"]))
 
 
+# 終わらない連戦の記録の比べ方(v0.3.0)。a・b は { kills, hits, ticks }。倒した数が多い方、同じなら受けた数が少ない方、同じなら時間が短い方。
+static func better_endless(a: Dictionary, b: Dictionary) -> bool:
+	var ak := int(a["kills"])
+	var bk := int(b["kills"])
+	if ak != bk:
+		return ak > bk
+	return better(a, b)
+
+
 # 秒の 10 倍(切り捨て)。18,504 tick → 1542。
 @warning_ignore("integer_division")
 static func tenths(ticks: int) -> int:

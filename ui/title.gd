@@ -140,31 +140,42 @@ func _ready() -> void:
 		put(_box, S.SAVE_BROKEN, 20, 500, Kit.C_SPARK, Rect2(40, y, 640, 30))
 	var easy: bool = _main.save.settings()["easy"] == true
 	if easy:  # 記録の行も、やさしい設定の記録になる
-		put(_box, S.EASY_ON, 20, 700, Kit.C_SPARK, Rect2(80, 548, 560, 32))
+		put(_box, S.EASY_ON, 20, 700, Kit.C_SPARK, Rect2(80, 544, 560, 32))
 
 	var fixed := Kit.button("btn_fixed", S.BTN_FIXED, 40, "primary")
 	fixed.disabled = not _data_ok
 	fixed.pressed.connect(_start.bind(Duel.Mode.FIXED))
-	_box.add_child(Kit.place(fixed, 80, 586, 560, 120))
+	_box.add_child(Kit.place(fixed, 80, 580, 560, 104))
 	var best: Variant = _main.save.fixed_best(easy)
 	if best is Dictionary:
-		put(_box, S.best_line(int(best["hits"]), Rank.seconds_text(int(best["ticks"]))), 22, 500, Kit.C_DIM, Rect2(80, 710, 560, 34))
+		put(_box, S.best_line(int(best["hits"]), Rank.seconds_text(int(best["ticks"]))), 22, 500, Kit.C_DIM, Rect2(80, 686, 560, 32))
 
 	var today: Dictionary = _main.today()
 	var daily := Kit.button("btn_daily", S.BTN_DAILY, 40)
 	daily.disabled = not _data_ok
 	daily.pressed.connect(_start.bind(Duel.Mode.DAILY))
-	_box.add_child(Kit.place(daily, 80, 764, 560, 120))
-	put(daily, str(today["date"]), 20, 500, Kit.C_DIM, Rect2(404, 0, 136, 120), HORIZONTAL_ALIGNMENT_RIGHT)
-	put(_box, _daily_line(_main.save.daily(int(today["day"]), easy)), 22, 500, Kit.C_DIM, Rect2(80, 888, 560, 34))
+	_box.add_child(Kit.place(daily, 80, 724, 560, 104))
+	put(daily, str(today["date"]), 20, 500, Kit.C_DIM, Rect2(404, 0, 136, 104), HORIZONTAL_ALIGNMENT_RIGHT)
+	put(_box, _daily_line(_main.save.daily(int(today["day"]), easy)), 22, 500, Kit.C_DIM, Rect2(80, 830, 560, 32))
 
-	put(_box, S.BTN_PRACTICE, 28, 700, Kit.C_TEXT, Rect2(80, 948, 96, 88), HORIZONTAL_ALIGNMENT_LEFT)
+	# 終わらない連戦(v0.3.0)。敵 3 に着いてから。最高はボタンの右に
+	var reached_all: bool = int(_main.save.reached_boss()) >= B.BOSS_COUNT
+	var endless := Kit.button("btn_endless", S.BTN_ENDLESS, 32)
+	endless.disabled = not _data_ok or not reached_all
+	endless.pressed.connect(func() -> void: _main.start_endless())
+	_box.add_child(Kit.place(endless, 80, 872, 560, 92))
+	var eb: Variant = _main.save.endless_best(easy)
+	var side := S.ENDLESS_LOCKED if not reached_all else (S.endless_best(int(eb["kills"])) if eb is Dictionary else "")
+	if side != "":
+		fit(put(endless, side, 18, 500, Kit.C_DIM, Rect2(372, 0, 176, 92), HORIZONTAL_ALIGNMENT_RIGHT))
+
+	put(_box, S.BTN_PRACTICE, 28, 700, Kit.C_TEXT, Rect2(80, 978, 96, 88), HORIZONTAL_ALIGNMENT_LEFT)
 	var reached: int = _main.save.reached_boss()
 	for n in range(1, B.BOSS_COUNT + 1):
 		var b := Kit.button("btn_practice_%d" % n, "", 28)
 		b.disabled = not _data_ok or n > reached
 		b.pressed.connect(_practice.bind(n))
-		_box.add_child(Kit.place(b, 184 + (n - 1) * 156, 948, 144, 88))
+		_box.add_child(Kit.place(b, 184 + (n - 1) * 156, 978, 144, 88))
 		var ink := Color(Kit.C_DIM, 0.45) if b.disabled else Kit.C_TEXT
 		put(b, S.boss_n(n), 28, 700, ink, Rect2(58, 0, 78, 88))
 		b.draw.connect(func() -> void: mark(b, n, Vector2(36, 44), 14.0, ink if b.disabled else Kit.boss_color(n)))
@@ -172,10 +183,13 @@ func _ready() -> void:
 	var drill := Kit.button("btn_drill", S.BTN_DRILL, 30)
 	drill.disabled = not _data_ok
 	drill.pressed.connect(func() -> void: _main.open_practice())
-	_box.add_child(Kit.place(drill, 80, 1078, 270, 88))
+	_box.add_child(Kit.place(drill, 80, 1086, 176, 88))
+	var achs := Kit.button("btn_achievements", S.BTN_ACH, 30)
+	achs.pressed.connect(func() -> void: _main.open_achievements())
+	_box.add_child(Kit.place(achs, 272, 1086, 176, 88))
 	var settings := Kit.button("btn_settings", S.BTN_SETTINGS, 30, "quiet")
 	settings.pressed.connect(func() -> void: _main.open_settings())
-	_box.add_child(Kit.place(settings, 370, 1078, 270, 88))
+	_box.add_child(Kit.place(settings, 464, 1086, 176, 88))
 	put(_box, S.VERSION, 20, 500, Kit.C_DIM, Rect2(24, 1228, 200, 32), HORIZONTAL_ALIGNMENT_LEFT)
 
 

@@ -83,7 +83,7 @@ func test_old_tab_writing_main_save_keeps_ext() -> bool:
 func test_unknown_fields_are_kept() -> bool:
 	_clean()
 	_write(PATH, '{"version":1,"fixed":null,"daily":null,"reached_boss":1,"later":{"x":1},"settings":{"volume":75,"shake":true,"reduce_flash":false,"offset_ticks":0,"later_setting":3}}')
-	_write(EXT, '{"version":1,"settings":{"easy":false,"show_diff":true,"bgm_volume":50},"easy":{"fixed":null,"daily":null,"later_book":1},"achievements":{"a":1}}')
+	_write(EXT, '{"version":1,"settings":{"easy":false,"show_diff":true,"bgm_volume":50},"easy":{"fixed":null,"daily":null,"later_book":1},"later_thing":{"a":1}}')
 	var s := SaveStore.new(PATH)
 	s.set_setting("shake", false)
 	var main := _read(PATH)
@@ -91,7 +91,7 @@ func test_unknown_fields_are_kept() -> bool:
 	eq(main.get("later"), {"x": 1.0}, "本の保存の知らない項目")
 	eq(main["settings"].get("later_setting"), 3.0, "本の保存の知らない設定")
 	eq(ext["settings"].get("bgm_volume"), 50.0, "ext の知らない設定")
-	eq(ext.get("achievements"), {"a": 1.0}, "ext の知らない項目")
+	eq(ext.get("later_thing"), {"a": 1.0}, "ext の知らない項目")
 	eq(ext["easy"].get("later_book"), 1.0, "やさしいの帳面の知らない項目")
 	_clean()
 	return true

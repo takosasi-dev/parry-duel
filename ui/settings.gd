@@ -28,28 +28,31 @@ func _ready() -> void:
 	_box = Title.box(self)
 	Title.put(_box, S.SETTINGS, 44, 900, Kit.C_TEXT, Rect2(60, 96, 600, 68), LEFT)
 
-	Title.put(_box, S.VOLUME, 26, 500, Kit.C_TEXT, Rect2(60, 196, 300, 42), LEFT)
-	for i in B.VOLUMES.size():
-		var v: int = B.VOLUMES[i]
-		_choice("btn_vol_%d" % v, S.volume(v), Rect2(60 + i * 122, 246, 112, 88), "volume", v)
-	_switch(S.SHAKE, 368.0, "shake", "btn_shake")
-	_switch(S.REDUCE_FLASH, 468.0, "reduce_flash", "btn_flash")
-	_switch(S.SHOW_DIFF, 568.0, "show_diff", "btn_diff")
-	_switch(S.EASY, 668.0, "easy", "btn_easy")
-	Title.fit(Title.put(_box, S.EASY_HINT, 20, 500, Kit.C_DIM, Rect2(60, 758, 600, 32), LEFT))
+	for row in 2:  # 効果音・BGM の音量(v0.3.0 で BGM を足した)
+		var key: String = ["volume", "bgm_volume"][row]
+		var y := 196.0 + row * 100.0
+		Title.fit(Title.put(_box, [S.VOLUME_SFX, S.VOLUME_BGM][row], 26, 500, Kit.C_TEXT, Rect2(60, y, 120, 88), LEFT))
+		for i in B.VOLUMES.size():
+			var v: int = B.VOLUMES[i]
+			_choice(("btn_vol_%d" if row == 0 else "btn_bgm_%d") % v, S.volume(v), Rect2(186 + i * 96, y, 88, 88), key, v)
+	_switch(S.SHAKE, 404.0, "shake", "btn_shake")
+	_switch(S.REDUCE_FLASH, 504.0, "reduce_flash", "btn_flash")
+	_switch(S.SHOW_DIFF, 604.0, "show_diff", "btn_diff")
+	_switch(S.EASY, 704.0, "easy", "btn_easy")
+	Title.fit(Title.put(_box, S.EASY_HINT, 20, 500, Kit.C_DIM, Rect2(60, 794, 600, 32), LEFT))
 
-	Title.put(_box, S.OFFSET, 26, 500, Kit.C_TEXT, Rect2(60, 812, 250, 88), LEFT)
+	Title.put(_box, S.OFFSET, 26, 500, Kit.C_TEXT, Rect2(60, 840, 250, 88), LEFT)
 	_minus = Kit.button("btn_offset_minus", "−", 40)
 	_minus.pressed.connect(_nudge.bind(-1))
-	_box.add_child(Kit.place(_minus, 320, 812, 92, 88))
-	_offset = Title.put(_box, "", 30, 700, Kit.C_TEXT, Rect2(412, 812, 156, 88))
+	_box.add_child(Kit.place(_minus, 320, 840, 92, 88))
+	_offset = Title.put(_box, "", 30, 700, Kit.C_TEXT, Rect2(412, 840, 156, 88))
 	_plus = Kit.button("btn_offset_plus", "+", 40)
 	_plus.pressed.connect(_nudge.bind(1))
-	_box.add_child(Kit.place(_plus, 568, 812, 92, 88))
-	Title.put(_box, S.OFFSET_HINT, 20, 500, Kit.C_DIM, Rect2(60, 904, 600, 32), LEFT)
+	_box.add_child(Kit.place(_plus, 568, 840, 92, 88))
+	Title.put(_box, S.OFFSET_HINT, 20, 500, Kit.C_DIM, Rect2(60, 932, 600, 32), LEFT)
 	var calib := Kit.button("btn_calib", S.BTN_CALIB, 30)
 	calib.pressed.connect(func() -> void: _main.open_calib())
-	_box.add_child(Kit.place(calib, 60, 946, 600, 88))
+	_box.add_child(Kit.place(calib, 60, 972, 600, 88))
 
 	# 「戻る」は、タイミング合わせの「戻る」と同じ場所(行き来しても動かない)
 	var back := Kit.button("btn_back", S.BTN_BACK, 32, "quiet")

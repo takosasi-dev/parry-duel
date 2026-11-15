@@ -24,6 +24,7 @@ var _copied: Label
 var _fx: Fx
 var _marks: Array = []  # 上に並べる敵の印
 var _won := false
+var _slashed := 99  # 斜線を引く印の数(終わらない連戦は倒した数まで)
 var _bright := false  # 新しい記録
 var _sparked := false
 var _t := 0.0
@@ -53,6 +54,19 @@ static func diff_line(result: Dictionary, record: Dictionary) -> Dictionary:
 	return {"text": S.SAME_AS_BEST, "bright": false}
 
 
+# 終わらない連戦の、最高との差の 1 行(v0.3.0)。倒した数で比べ、同じなら受けた数・時間で比べる。
+static func endless_diff_line(result: Dictionary, record: Dictionary) -> Dictionary:
+	var prev: Variant = record["prev_best"]
+	if not (prev is Dictionary):
+		return {"text": S.FIRST_RECORD, "bright": true}
+	var dk := int(result["kills"]) - int(prev["kills"])
+	if dk > 0:
+		return {"text": S.endless_beyond(dk), "bright": true}
+	if dk < 0:
+		return {"text": S.endless_more(-dk), "bright": false}
+	return diff_line(result, record)
+
+
 # 共有する文字の全部の行が、幅 width に折り返さずに入る字の大きさ。
 static func share_font_size(text: String, width: float) -> int:
 	for sz: int in SHARE_SIZES:
@@ -79,21 +93,38 @@ func _ready() -> void:
 	_won = r["won"]
 	var oy := 110.0 if practice else 0.0  # 練習は物が少ないので、下へ寄せる
 
+	var endless: bool = int(r["mode"]) == 4  # Duel.Mode.ENDLESS(終わらない連戦。v0.3.0)
 	var head := S.RESULT_WIN
 	if practice:
 		head = S.practice_win(boss) if _won else S.PRACTICE_LOSE
 		_marks = [boss]
 	else:
 		_marks = range(1, B.BOSS_COUNT + 1)
+	if endless:
+		head = S.ENDLESS
+		_won = true  # 終わりは必ず負けだが、倒した数を祝う見た目にする
+		_slashed = mini(int(r.get("kills", 0)), _marks.size())  # 斜線は倒した数だけ
 	Title.put(_box, head, 32, 700, Kit.C_TEXT, Rect2(20, 142 + oy, 680, 50))
-	Title.fit(Title.put(_box, S.hits_or_unhurt(hits), 96, 900, Kit.C_PLAYER if hits == 0 else Kit.C_TEXT, Rect2(20, 204 + oy, 680, 144)))
-	Title.put(_box, S.seconds(Rank.seconds_text(int(r["ticks"]))), 48, 700, Kit.C_TEXT, Rect2(20, 350 + oy, 680, 72))
-	if not practice and _won:
+	if endless:
+		Title.fit(Title.put(_box, S.kills(int(r.get("kills", 0))), 96, 900, Kit.C_SPARK, Rect2(20, 204, 680, 144)))
+		Title.fit(Title.put(_box, "%s / %s" % [S.hits(hits), S.seconds(Rank.seconds_text(int(r["ticks"])))], 40, 700, Kit.C_TEXT, Rect2(20, 350, 680, 72)))
+	else:
+		Title.fit(Title.put(_box, S.hits_or_unhurt(hits), 96, 900, Kit.C_PLAYER if hits == 0 else Kit.C_TEXT, Rect2(20, 204 + oy, 680, 144)))
+		Title.put(_box, S.seconds(Rank.seconds_text(int(r["ticks"]))), 48, 700, Kit.C_TEXT, Rect2(20, 350 + oy, 680, 72))
+	if endless:
+		var ed := endless_diff_line(r, _info["record"])
+		_bright = ed["bright"]
+		Title.fit(Title.put(_box, ed["text"], 26, 700 if _bright else 500, Kit.C_SPARK if _bright else Kit.C_DIM, Rect2(20, 428, 680, 42)))
+	elif not practice and _won:
 		var diff := diff_line(r, _info["record"])
 		_bright = diff["bright"]
 		Title.fit(Title.put(_box, diff["text"], 26, 700 if _bright else 500, Kit.C_SPARK if _bright else Kit.C_DIM, Rect2(20, 428, 680, 42)))
-	Title.put(_box, S.justs(int(r["justs"])), 26, 500, Kit.C_DIM, Rect2(60, 482 + oy, 280, 42), HORIZONTAL_ALIGNMENT_RIGHT)
-	Title.put(_box, S.retries(int(r["retries"])), 26, 500, Kit.C_DIM, Rect2(380, 482 + oy, 280, 42), HORIZONTAL_ALIGNMENT_LEFT)
+	if endless:  # やり直しの行が無いので、ぴったりは真ん中に
+		Title.put(_box, S.justs(int(r["justs"])), 26, 500, Kit.C_DIM, Rect2(20, 482, 680, 42))
+	else:
+		Title.put(_box, S.justs(int(r["justs"])), 26, 500, Kit.C_DIM, Rect2(60, 482 + oy, 280, 42), HORIZONTAL_ALIGNMENT_RIGHT)
+	if not endless:  # 終わらない連戦には、やり直しが無い
+		Title.put(_box, S.retries(int(r["retries"])), 26, 500, Kit.C_DIM, Rect2(380, 482 + oy, 280, 42), HORIZONTAL_ALIGNMENT_LEFT)
 
 	_again = Kit.button("btn_again", S.BTN_AGAIN, 40, "primary")
 	_again.disabled = true
@@ -208,7 +239,7 @@ func _draw_marks() -> void:
 	var y := 96.0 + (110.0 if _info["practice"] else 0.0)
 	for i in _marks.size():
 		var boss: int = _marks[i]
-		var slash := clampf((_t - 0.1 - 0.08 * i) / 0.14, 0.001, 1.0) if _won else 0.0
+		var slash := clampf((_t - 0.1 - 0.08 * i) / 0.14, 0.001, 1.0) if _won and i < _slashed else 0.0
 		Title.mark(_box, boss, Vector2(360.0 + (i - (_marks.size() - 1) / 2.0) * 68.0, y), 22.0, Kit.boss_color(boss), slash)
 
 

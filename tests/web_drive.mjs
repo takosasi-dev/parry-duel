@@ -11,6 +11,7 @@
 //   node tests/web_drive.mjs --storage            別のタブ・別のゲームの保存を消さない、v0.1.1 までの保存を引き継ぐ
 //   node tests/web_drive.mjs --drill              型の練習: 型を選んで、本物のキーで繰り返し弾く(v0.2.0)
 //   node tests/web_drive.mjs --pad                ゲームパッド: 偽のパッドで、メニューを選んで押す・対戦で弾く・一時停止(v0.2.0)
+//   node tests/web_drive.mjs --endless            終わらない連戦: 1 体倒して合間・負けて結果・記録と実績が保存に届く(v0.3.0)
 //   node tests/web_drive.mjs --latency [key|mouse|touch] [--gpu]   入力から描画までの時間を、押し 100 回ぶん測る(NFR-2・仕様書 §8.2)
 //   node tests/web_drive.mjs --perf               自動の相手に 60 秒戦わせた 1 フレームの時間(NFR-1。窓なしなので参考値)
 //   node tests/web_drive.mjs --quiet              読み込みの後、3 分間の通信が 0 件(NFR-8・AC-31)
@@ -522,6 +523,49 @@ async function pad(base) {
 	}
 }
 
+// 終わらない連戦(v0.3.0): 本物のキーで 1 体倒す → 合間に倒した数と次の速さ → 2 体目で押すのをやめて負ける →
+// 結果に倒した数、記録と実績が保存に届く。取った時の知らせも出る
+async function endless(base) {
+	for (const name of browsers()) {
+		await withPage(name, `${base}?debug=1&go=endless`, {}, async (page) => {
+			let s = await page.waitState((st) => st.screen === 'duel' && st.duel?.mode === 4, 30000);
+			if (!expect(s !== null, `${name}: 終わらない連戦が始まる`)) return;
+			const done = new Set();
+			let toast = '';
+			const end = Date.now() + 60000;
+			while (Date.now() < end) {
+				s = await page.state();
+				if (s.toast) toast = s.toast;
+				if (s.screen !== 'duel') break;
+				for (const a of s.duel?.attacks ?? []) {
+					if (done.has(a.id)) continue;
+					if (a.kind === 'white' && s.duel.tick >= a.judged - 3) { done.add(a.id); await page.key('Space'); }
+					else if (a.kind === 'red' && s.duel.tick >= a.judged - 14) { done.add(a.id); await page.key('KeyZ'); }
+				}
+				if (s.duel?.state === 'STAGGER' && s.duel.tick % 20 === 0) await page.key('Space');
+				await sleep(8);
+			}
+			s = await page.waitState((st) => st.screen === 'interval', 10000);
+			if (!expect(s !== null, `${name}: 1 体倒すと合間の画面`)) return;
+			await sleep(900);
+			await page.shot('endless_interval');
+			expect(toast !== '', `${name}: 実績の知らせが出た(${toast})`);
+			await page.key('Enter');
+			s = await page.waitState((st) => st.screen === 'duel' && st.duel?.boss === 2, 8000);
+			expect(s !== null && s.duel.kills === 1, `${name}: 2 体目は敵 2(倒した数 ${s?.duel.kills})`);
+			s = await page.waitState((st) => st.screen === 'result', 90000, 250);  // 押さずに負ける
+			if (!expect(s !== null, `${name}: 負けると結果の画面(やり直しは出ない)`)) return;
+			await sleep(1500);
+			await page.shot('endless_result');
+			const ext = await page.savedExt();
+			expect(ext?.endless?.normal?.kills === 1 && Object.keys(ext?.achievements ?? {}).includes('first_parry'),
+				`${name}: 記録と実績が保存に届く(連戦: ${JSON.stringify(ext?.endless?.normal)}、実績: ${Object.keys(ext?.achievements ?? {}).join(' ')})`);
+			expect(s.save_failed === false, `${name}: 書けた時に失敗扱いにならない`);
+			noErrors(page);
+		});
+	}
+}
+
 // 対戦の教える型(当たっても減らない)の中で、90 ms おきに 110 回押す。押すたびに、ゲームがその押しから描き終わりまでを測る
 // how が mouse・touch の時は、右半分を押す(touch はスマホのエミュレーション)
 async function latency(base, how) {
@@ -620,6 +664,7 @@ const MODES = {
 	'--storage': (b) => storage(b),
 	'--drill': (b) => drill(b),
 	'--pad': (b) => pad(b),
+	'--endless': (b) => endless(b),
 	'--latency': (b) => latency(b, valueOf('--latency') ?? 'key'),
 	'--perf': (b) => perf(b),
 	'--quiet': (b) => quiet(b),

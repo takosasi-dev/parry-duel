@@ -28,9 +28,12 @@ func _ready() -> void:
 	_box.draw.connect(_draw_mark)
 	var boss: int = _info["boss"]
 	var hits: int = _info["hits"]
-	Title.put(_box, S.boss_beaten(boss), 56, 900, Kit.C_TEXT, Rect2(20, 520, 680, 84))
+	var endless: bool = int(_info.get("mode", -1)) == 4  # Duel.Mode.ENDLESS(終わらない連戦。v0.3.0)
+	Title.put(_box, S.endless_beaten(int(_info["kills"])) if endless else S.boss_beaten(boss), 56, 900, Kit.C_TEXT, Rect2(20, 520, 680, 84))
 	Title.put(_box, S.so_far(hits, Rank.seconds_text(int(_info["ticks"]))), 30, 500, Kit.C_TEXT, Rect2(20, 628, 680, 46))
 	Title.put(_box, S.justs(int(_info["justs"])), 26, 500, Kit.C_DIM, Rect2(20, 678, 680, 40))
+	if endless:
+		Title.put(_box, S.endless_speed(int(_info["next_speed"])), 26, 700, Kit.C_SPARK, Rect2(20, 724, 680, 40))
 	_next = Kit.button("btn_next", S.BTN_NEXT, 40, "primary")
 	_next.disabled = true
 	_next.pressed.connect(_go)

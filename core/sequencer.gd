@@ -14,9 +14,12 @@ var _last_id := ""
 
 
 # boss と phase は 1 から。patterns はその段階の型(定義の順)。teach_ok が真なら教える型を飛ばす。
-func _init(seed_value: int, boss: int, phase: int, patterns: Array, teach_ok: bool) -> void:
+# mixed が真なら、定義の順の 1 周目を飛ばして、最初から混ぜて出す(終わらない連戦の 2 周目から。v0.3.0)。
+func _init(seed_value: int, boss: int, phase: int, patterns: Array, teach_ok: bool, mixed: bool = false) -> void:
 	_patterns = patterns
 	_teach_ok = teach_ok
+	if mixed:
+		_index = patterns.size()
 	_rng = Rng.new(phase_seed(seed_value, boss, phase))
 	for p: Dictionary in patterns:
 		if not p["teach"]:

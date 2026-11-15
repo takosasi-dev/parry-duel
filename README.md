@@ -8,7 +8,7 @@
   <img src="docs/play.gif" width="300" alt="遊んでいる様子。白い丸が線に届く瞬間に弾くと火花が出て、敵のよろけが溜まる。よろけた敵に「いま!」の合図で反撃する">
 </p>
 
-> v0.2.0。判定の窓などの調整値は、まだ人に遊んでもらって決めた値ではありません。遊んだ結果を見て変えることがあります。
+> v0.3.0。判定の窓などの調整値は、まだ人に遊んでもらって決めた値ではありません。遊んだ結果を見て変えることがあります。
 
 ## 遊び方
 
@@ -41,7 +41,9 @@
   <img src="docs/duel_gray.png" width="240" alt="対戦の画面を白黒にした物。丸と三角の形で、弾く攻撃と避ける攻撃が見分けられる">
 </p>
 
-入口は「いつもの3連戦」(毎回同じ)と「今日の3連戦」(日付で決まり、同じ日なら誰でも同じ型が同じ順に出る)の 2 つです。着いたことのある敵は、1 体だけの練習もできます(記録には残りません)。「型の練習」では、苦手な型を 1 つ選んで繰り返せます。体力は減らず、「ゆっくり」(0.75 倍の速さ)にもできます。結果の画面の文字をコピーして貼れば、受けた数と時間を比べられます。
+入口は「いつもの3連戦」(毎回同じ)と「今日の3連戦」(日付で決まり、同じ日なら誰でも同じ型が同じ順に出る)の 2 つです。着いたことのある敵は、1 体だけの練習もできます(記録には残りません)。「型の練習」では、苦手な型を 1 つ選んで繰り返せます。体力は減らず、「ゆっくり」(0.75 倍の速さ)にもできます。
+
+敵 3 に着くと「終わらない連戦」で遊べます。敵 1〜3 を繰り返し、1 周ごとに攻撃が速くなります(上限 1.25 倍)。体力は持ち越しで、1 体倒すごとに 1 戻ります。倒した数を競います。実績は 14 個あり、タイトルの「実績」で一覧を見られます。結果の画面の文字をコピーして貼れば、受けた数と時間を比べられます。
 
 <p>
   <img src="docs/title.png" width="200" alt="タイトルの画面。いつもの3連戦・今日の3連戦・練習・設定のボタンと、最高の記録の行">
@@ -53,6 +55,7 @@
   <img src="docs/settings.png" width="200" alt="設定の画面。音量・画面の揺れ・点滅を弱める・判定のずれ">
   <img src="docs/calib.png" width="200" alt="タイミング合わせの画面。線に届く瞬間に 8 回押して、合う「判定のずれ」を測る">
   <img src="docs/practice.png" width="200" alt="型の練習の画面。敵のタブと、段階ごとの型のボタン。ボタンにはその型の攻撃が小さく描いてある">
+  <img src="docs/achievements.png" width="200" alt="実績の一覧。取った実績は明るい菱形と取った日、まだの物は暗く取り方だけが出ている">
 </p>
 
 ## 判定の決まり
@@ -93,9 +96,10 @@ python tools/gd.py export
 node tests/web_drive.mjs --all
 node tests/web_drive.mjs --play key      # 1 つだけ回す。モードの一覧は、ファイルの頭にある
 
-# 字体の部分集合を作り直す(文言を足した後)・効果音を作り直す
+# 字体の部分集合を作り直す(文言を足した後)・効果音を作り直す・BGM を作り直す(ffmpeg が要る)
 python tools/subset_font.py
 python tools/gen_sfx.py
+python tools/gen_bgm.py
 ```
 
 `main` に push すると、GitHub Actions(`.github/workflows/pages.yml`)がテスト・Web 書き出し・GitHub Pages への配置を行います。テストが落ちたら配置しません。書き出した物(`build/`)はコミットしません。変更の記録は [CHANGELOG.md](CHANGELOG.md)。
@@ -107,10 +111,10 @@ core/     画面に依存しない決まり(判定・対戦の進み・型の検
 data/     型 30 個(patterns.json)
 ui/       画面(タイトル・対戦・合間・結果・設定・タイミング合わせ・一時停止・型の練習)と演出
 save/     ブラウザ内への保存
-audio/    効果音の再生
-assets/   字体と効果音
+audio/    効果音と BGM の再生
+assets/   字体と効果音と BGM
 tests/    テスト(run_tests.gd)と、ブラウザでの自動の確認(web_drive.mjs・web/)
-tools/    窓なしで回す入口(gd.py)、字体・効果音・アイコンを作るスクリプト
+tools/    窓なしで回す入口(gd.py)、字体・効果音・BGM・アイコンを作るスクリプト
 docs/     README の画像
 ```
 
@@ -118,4 +122,4 @@ docs/     README の画像
 
 ## ライセンス
 
-コードは [MIT](LICENSE)。効果音は `tools/gen_sfx.py` で作った自作です。同梱の字体(Noto Sans JP の部分集合)は SIL Open Font License 1.1 です。Godot Engine の表示を含め、詳しくは [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+コードは [MIT](LICENSE)。効果音は `tools/gen_sfx.py`、BGM は `tools/gen_bgm.py` で作った自作です。同梱の字体(Noto Sans JP の部分集合)は SIL Open Font License 1.1 です。Godot Engine の表示を含め、詳しくは [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。

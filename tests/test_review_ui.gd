@@ -35,7 +35,7 @@ func _tick_all(n: int = 1, delta: float = FRAME) -> void:
 func _live_names() -> Array:
 	var out: Array = []
 	for c: Node in _main.stage.get_children():
-		if not c.is_queued_for_deletion() and c != _main.view:
+		if not c.is_queued_for_deletion() and c != _main.view and c != _main.toast:  # 実績の知らせ(v0.3.0)は画面ではない
 			out.append(c.get_script().resource_path.get_file().get_basename())
 	return out
 

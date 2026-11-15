@@ -22,7 +22,7 @@ const WEB_KEY_EXT := "parry-duel/ext"
 # 書けたかは文字の "ok" で返す(JS の true は、Godot 4.7.2 の Web では bool として届かず、`is bool` が偽になった。v0.1.2 の不具合)
 const JS_READ := "(() => { try { return localStorage.getItem('%s'); } catch (e) { return null; } })()"
 const JS_WRITE := "(() => { try { localStorage.setItem('%s', %s); return 'ok'; } catch (e) { return 'no'; } })()"
-const EXT_SETTINGS := ["easy", "show_diff"]  # ext に置く設定
+const EXT_SETTINGS := ["easy", "show_diff", "bgm_volume"]  # ext に置く設定
 
 var path: String
 var data: Dictionary = {}
@@ -42,7 +42,7 @@ static func default_settings() -> Dictionary:
 
 
 static func default_ext_settings() -> Dictionary:
-	return {"easy": false, "show_diff": true}
+	return {"easy": false, "show_diff": true, "bgm_volume": B.DEFAULT_BGM_VOLUME}
 
 
 static func defaults() -> Dictionary:
@@ -50,7 +50,8 @@ static func defaults() -> Dictionary:
 
 
 static func ext_defaults() -> Dictionary:
-	return {"version": EXT_VERSION, "settings": default_ext_settings(), "easy": {"fixed": null, "daily": null}}
+	return {"version": EXT_VERSION, "settings": default_ext_settings(), "easy": {"fixed": null, "daily": null},
+		"endless": {"normal": null, "easy": null}, "achievements": {}, "counts": {}}
 
 
 func ext_path() -> String:
@@ -129,14 +130,28 @@ static func _parse_ext(text: String) -> Variant:
 	var out := ext_defaults()
 	var st: Variant = v.get("settings")
 	if st is Dictionary:
-		for k: String in EXT_SETTINGS:
+		for k: String in ["easy", "show_diff"]:
 			if st.get(k) is bool:
 				out["settings"][k] = st[k]
+		if _is_num(st.get("bgm_volume")) and int(st["bgm_volume"]) in B.VOLUMES:
+			out["settings"]["bgm_volume"] = int(st["bgm_volume"])
 		_keep_unknown(st, out["settings"])
 	if _is_num(v.get("version")) and float(v["version"]) == float(EXT_VERSION):
 		if v.get("easy") is Dictionary:
 			_read_book(v["easy"], out["easy"])
 			_keep_unknown(v["easy"], out["easy"])
+		if v.get("achievements") is Dictionary:  # { id: 取った日 }
+			for k: Variant in v["achievements"]:
+				if k is String and v["achievements"][k] is String:
+					out["achievements"][k] = v["achievements"][k]
+		if v.get("counts") is Dictionary:
+			for k: Variant in v["counts"]:
+				if k is String and _is_num(v["counts"][k]):
+					out["counts"][k] = maxi(int(v["counts"][k]), 0)
+		if v.get("endless") is Dictionary:
+			for k: String in ["normal", "easy"]:
+				out["endless"][k] = _read_endless(v["endless"].get(k))
+			_keep_unknown(v["endless"], out["endless"])
 	_keep_unknown(v, out)
 	return out
 
@@ -169,6 +184,15 @@ func _merge_from_disk() -> void:
 	var disk_ext: Variant = _parse_ext(text_ext) if text_ext != null else null
 	if disk_ext != null:
 		_merge_book(ext["easy"], disk_ext["easy"])
+		for k: String in ["normal", "easy"]:
+			ext["endless"][k] = _better_endless_of(ext["endless"][k], disk_ext["endless"][k])
+		# 実績は両方を合わせる(早い日を残す)。数は大きい方(どちらのタブも足すだけなので)
+		for id: String in disk_ext["achievements"]:
+			var theirs: String = disk_ext["achievements"][id]
+			if not ext["achievements"].has(id) or theirs < str(ext["achievements"][id]):
+				ext["achievements"][id] = theirs
+		for k: String in disk_ext["counts"]:
+			ext["counts"][k] = maxi(int(ext["counts"].get(k, 0)), int(disk_ext["counts"][k]))
 		_keep_unknown(disk_ext, ext)
 		_keep_unknown(disk_ext["settings"], ext["settings"])
 
@@ -201,6 +225,59 @@ func save_data() -> bool:
 	var ok_ext := _write_text(WEB_KEY_EXT, ext_path(), JSON.stringify(ext, "", false))
 	write_failed = not (ok_main and ok_ext)
 	return not write_failed
+
+
+static func _better_endless_of(a: Variant, b: Variant) -> Variant:
+	if not (a is Dictionary):
+		return b
+	if not (b is Dictionary):
+		return a
+	return b if Rank.better_endless(b, a) else a
+
+
+static func _read_endless(v: Variant) -> Variant:
+	if not (v is Dictionary) or not _is_num(v.get("kills")) or not _is_num(v.get("hits")) or not _is_num(v.get("ticks")):
+		return null
+	return {"kills": maxi(int(v["kills"]), 0), "hits": maxi(int(v["hits"]), 0), "ticks": maxi(int(v["ticks"]), 0)}
+
+
+# 取った実績 { id: 取った日 }(v0.3.0)。
+func achievements() -> Dictionary:
+	return ext["achievements"]
+
+
+# ずっと数える数(赤を避けた数など)。実績の判定が足す。書くのは save_data の時。
+func counts() -> Dictionary:
+	return ext["counts"]
+
+
+# 実績を取る。まだ取っていなかった id を返し、あれば保存する。
+func unlock(ids: Array, date: String) -> Array:
+	var fresh: Array = []
+	for id: Variant in ids:
+		if id is String and not ext["achievements"].has(id) and not fresh.has(id):
+			ext["achievements"][id] = date
+			fresh.append(id)
+	if not fresh.is_empty():
+		save_data()
+	return fresh
+
+
+# 終わらない連戦の最高(v0.3.0)。{ kills, hits, ticks } か null。
+func endless_best(easy: bool = false) -> Variant:
+	return ext["endless"]["easy" if easy else "normal"]
+
+
+# 終わらない連戦の回を記録する。{ prev_best, new_best, first_today, saved } を返す(first_today はいつも偽)。
+func record_endless(result: Dictionary) -> Dictionary:
+	var easy: bool = result.get("easy", false) == true
+	var out := {"prev_best": endless_best(easy), "new_best": false, "first_today": false, "saved": true}
+	var rec := {"kills": int(result["kills"]), "hits": int(result["hits"]), "ticks": int(result["ticks"])}
+	out["new_best"] = out["prev_best"] == null or Rank.better_endless(rec, out["prev_best"])
+	if out["new_best"]:
+		ext["endless"]["easy" if easy else "normal"] = rec
+	out["saved"] = save_data()
+	return out
 
 
 static func _is_num(v: Variant) -> bool:

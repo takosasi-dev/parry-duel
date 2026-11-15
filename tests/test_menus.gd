@@ -489,7 +489,7 @@ func test_buttons_are_tall_and_do_not_overlap() -> bool:
 			ok(b.position.x >= 0.0 and b.position.x + b.size.x <= 720.0, "%s の %s は画面の中" % [pair[0], b.name])
 			for other: Button in buttons:
 				ok(other == b or not b.get_rect().intersects(other.get_rect()), "%s の %s と %s が重ならない" % [pair[0], b.name, other.name])
-	eq(n, 7 + 17 + 1 + 3 + 3, "ボタンは全部で 31 個(v0.2.0 でタイトルに型の練習、設定に 2 行)")
+	eq(n, 9 + 22 + 1 + 3 + 3, "ボタンは全部で 38 個(v0.2.0 でタイトルに型の練習、設定に 2 行、v0.3.0 で BGM の音量・終わらない連戦・実績)")
 	main.free()
 	return true
 

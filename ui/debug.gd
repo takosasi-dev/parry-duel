@@ -195,7 +195,7 @@ func state() -> Dictionary:
 		"frame": frame, "screen": main.screen_name, "vp": [get_viewport_rect().size.x, get_viewport_rect().size.y],
 		"stage": [main.stage.position.x, main.stage.position.y], "renderer": RenderingServer.get_video_adapter_name(),
 		"lat_godot": stats(lat_godot), "lat_js": stats(lat_js), "press": press_stats(), "perf": _perf, "inputs": input_log, "buttons": _buttons(main.stage, {}),
-		"sfx": Sfx.get("played") if Sfx.get("played") != null else -1, "pad": main.pad, "save_failed": main.save.write_failed,
+		"sfx": Sfx.get("played") if Sfx.get("played") != null else -1, "pad": main.pad, "save_failed": main.save.write_failed, "ach": main.save.achievements().keys(), "toast": main.toast.current,
 		"focus": str(get_viewport().gui_get_focus_owner().name) if get_viewport().gui_get_focus_owner() != null else "",
 	}
 	var view: Node = main.view
@@ -210,7 +210,7 @@ func state() -> Dictionary:
 			"freeze": d.freeze_ticks, "hits": d.hits, "justs": d.justs, "parries": d.parries, "retries": d.retries,
 			"over": d.over, "won": d.won, "offset": d.offset, "teaching": not d.teach_done[d.boss - 1],
 			"paused": view.paused, "resume_left": view.resume_left, "attacks": attacks, "events": view.event_log,
-			"steps": view.steps_last_frame, "speed": d.speed, "easy": d.easy, "drill_id": d.drill_id, "diffs": d.diffs.size(),
+			"steps": view.steps_last_frame, "speed": d.speed, "easy": d.easy, "drill_id": d.drill_id, "diffs": d.diffs.size(), "kills": d.kills,
 		}
 	var calib_view: Node = main.calib_view
 	if calib_view != null and is_instance_valid(calib_view):

@@ -89,6 +89,7 @@ func _nudge(d: int) -> void:
 func _on_use() -> void:
 	if _suggest != null:
 		_set_offset(int(_suggest))
+		_main.achieve(["calib"])  # 実績(v0.3.0)
 	_main.close_calib()
 
 
